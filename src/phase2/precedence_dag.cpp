@@ -156,8 +156,67 @@ bool PrecedenceDAG::isAcyclic() {
 }
 
 std::vector<int> PrecedenceDAG::topologicalSort() {
-    // Will implement in Task 9
-    return std::vector<int>();
+    // Kahn's algorithm for topological sorting
+    // Returns bendIds in valid topological order, or empty vector if graph has cycles
+
+    std::vector<int> result;
+
+    // First check if graph is acyclic
+    if (!isAcyclic()) {
+        return result;  // Return empty - cannot sort cyclic graph
+    }
+
+    if (m_nodes.empty()) {
+        return result;  // Empty graph
+    }
+
+    // Calculate in-degree for each node (count of predecessors)
+    std::vector<int> inDegree(m_nodes.size(), 0);
+    for (const auto& node : m_nodes) {
+        inDegree[node.id] = static_cast<int>(node.predecessors.size());
+    }
+
+    // Queue of nodes with in-degree 0 (ready to process)
+    std::queue<int> queue;
+    for (size_t i = 0; i < m_nodes.size(); i++) {
+        if (inDegree[i] == 0) {
+            queue.push(static_cast<int>(i));
+        }
+    }
+
+    // Process nodes in topological order
+    while (!queue.empty()) {
+        int currentId = queue.front();
+        queue.pop();
+
+        const PrecedenceNode& currentNode = m_nodes[currentId];
+        result.push_back(currentNode.bendId);  // Add bendId to result
+
+        // Decrease in-degree of all successors
+        for (int successorBendId : currentNode.successors) {
+            // Find successor node by bendId
+            for (size_t i = 0; i < m_nodes.size(); i++) {
+                if (m_nodes[i].bendId == successorBendId) {
+                    inDegree[i]--;
+
+                    // If in-degree becomes 0, add to queue
+                    if (inDegree[i] == 0) {
+                        queue.push(static_cast<int>(i));
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // If result doesn't contain all nodes, graph had a cycle
+    // (This shouldn't happen since we checked isAcyclic first)
+    if (result.size() != m_nodes.size()) {
+        result.clear();
+        return result;
+    }
+
+    return result;
 }
 
 bool PrecedenceDAG::hasCycleDFS(int nodeId, std::vector<int>& state) {

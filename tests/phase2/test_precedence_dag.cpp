@@ -224,3 +224,111 @@ TEST_CASE("PrecedenceDAG isAcyclic - complex cycle", "[phase2][dag]") {
 
     REQUIRE(dag.isAcyclic() == false);
 }
+
+TEST_CASE("PrecedenceDAG topologicalSort - simple chain", "[phase2][dag][toposort]") {
+    PrecedenceDAG dag;
+
+    // Simple chain: 0 -> 1 -> 2
+    dag.addNode(0);
+    dag.addNode(1);
+    dag.addNode(2);
+    dag.addEdge(0, 1, ConstraintType::GEOMETRIC, 1.0, "0->1");
+    dag.addEdge(1, 2, ConstraintType::GEOMETRIC, 1.0, "1->2");
+
+    dag.finalize();
+
+    std::vector<int> order = dag.topologicalSort();
+
+    // Should return valid ordering
+    REQUIRE(order.size() == 3);
+
+    // Find positions of each node in the ordering
+    int pos0 = -1, pos1 = -1, pos2 = -1;
+    for (size_t i = 0; i < order.size(); i++) {
+        if (order[i] == 0) pos0 = static_cast<int>(i);
+        if (order[i] == 1) pos1 = static_cast<int>(i);
+        if (order[i] == 2) pos2 = static_cast<int>(i);
+    }
+
+    // 0 must come before 1, and 1 must come before 2
+    REQUIRE(pos0 < pos1);
+    REQUIRE(pos1 < pos2);
+}
+
+TEST_CASE("PrecedenceDAG topologicalSort - diamond pattern", "[phase2][dag][toposort]") {
+    PrecedenceDAG dag;
+
+    // Diamond: 0 -> {1, 2} -> 3
+    dag.addNode(0);
+    dag.addNode(1);
+    dag.addNode(2);
+    dag.addNode(3);
+    dag.addEdge(0, 1, ConstraintType::GEOMETRIC, 1.0, "0->1");
+    dag.addEdge(0, 2, ConstraintType::GEOMETRIC, 1.0, "0->2");
+    dag.addEdge(1, 3, ConstraintType::GEOMETRIC, 1.0, "1->3");
+    dag.addEdge(2, 3, ConstraintType::GEOMETRIC, 1.0, "2->3");
+
+    dag.finalize();
+
+    std::vector<int> order = dag.topologicalSort();
+
+    REQUIRE(order.size() == 4);
+
+    // Find positions
+    int pos0 = -1, pos1 = -1, pos2 = -1, pos3 = -1;
+    for (size_t i = 0; i < order.size(); i++) {
+        if (order[i] == 0) pos0 = static_cast<int>(i);
+        if (order[i] == 1) pos1 = static_cast<int>(i);
+        if (order[i] == 2) pos2 = static_cast<int>(i);
+        if (order[i] == 3) pos3 = static_cast<int>(i);
+    }
+
+    // 0 must come before 1 and 2
+    REQUIRE(pos0 < pos1);
+    REQUIRE(pos0 < pos2);
+
+    // 1 and 2 must come before 3
+    REQUIRE(pos1 < pos3);
+    REQUIRE(pos2 < pos3);
+}
+
+TEST_CASE("PrecedenceDAG topologicalSort - with cycle returns empty", "[phase2][dag][toposort]") {
+    PrecedenceDAG dag;
+
+    // Create cycle: 0 -> 1 -> 2 -> 0
+    dag.addNode(0);
+    dag.addNode(1);
+    dag.addNode(2);
+    dag.addEdge(0, 1, ConstraintType::GEOMETRIC, 1.0, "0->1");
+    dag.addEdge(1, 2, ConstraintType::GEOMETRIC, 1.0, "1->2");
+    dag.addEdge(2, 0, ConstraintType::GEOMETRIC, 1.0, "2->0");
+
+    dag.finalize();
+
+    std::vector<int> order = dag.topologicalSort();
+
+    // Should return empty vector for cyclic graph
+    REQUIRE(order.empty());
+}
+
+TEST_CASE("PrecedenceDAG topologicalSort - empty graph", "[phase2][dag][toposort]") {
+    PrecedenceDAG dag;
+
+    dag.finalize();
+
+    std::vector<int> order = dag.topologicalSort();
+
+    REQUIRE(order.empty());
+}
+
+TEST_CASE("PrecedenceDAG topologicalSort - single node", "[phase2][dag][toposort]") {
+    PrecedenceDAG dag;
+
+    dag.addNode(42);
+    dag.finalize();
+
+    std::vector<int> order = dag.topologicalSort();
+
+    REQUIRE(order.size() == 1);
+    REQUIRE(order[0] == 42);
+}
