@@ -107,10 +107,27 @@ private:
      * Finds combination of ABA segments that sum to required width.
      * Uses dynamic programming approach.
      *
+     * Optimization priorities:
+     * 1. Cover target width (must satisfy)
+     * 2. Minimize segment count (fewer = faster)
+     * 3. Minimize waste (closer to target)
+     *
      * @param targetWidth Required tool width
      * @return Vector of segment sizes (empty if no solution)
      */
     std::vector<int> solveSubsetSum(
+        double targetWidth
+    );
+
+    /**
+     * @brief Greedy fallback for very large targets
+     *
+     * Used when target > 1000mm (DP table too large).
+     *
+     * @param targetWidth Required tool width
+     * @return Vector of segment sizes
+     */
+    std::vector<int> solveGreedy(
         double targetWidth
     );
 

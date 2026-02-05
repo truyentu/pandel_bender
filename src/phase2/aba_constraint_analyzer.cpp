@@ -118,13 +118,111 @@ double ABAConstraintAnalyzer::calculateClearance(
 std::vector<int> ABAConstraintAnalyzer::solveSubsetSum(
     double targetWidth
 ) {
-    // Subset sum problem: Find combination of segments that sum to target
-    // This is a simplified greedy approach
-    // Real implementation would use dynamic programming
+    // Dynamic Programming Subset Sum Solver
+    // ======================================
+    //
+    // Goal: Find optimal combination of ABA segments to cover target width
+    //
+    // Optimization criteria (priority order):
+    // 1. Must cover target width (totalWidth >= target)
+    // 2. Minimize number of segments (fewer segments = faster setup)
+    // 3. Minimize waste (totalWidth - target)
+    //
+    // Algorithm: DP with backtracking
+    // State: dp[w] = minimum segments to achieve width w
+    // Transition: dp[w] = min(dp[w], dp[w - segment] + 1)
+    //
+    // Complexity: O(target × segments) where segments = 8
+
+    // Round target to integer for DP table
+    int target = static_cast<int>(std::ceil(targetWidth));
+
+    // Limit table size for performance (max 1000mm)
+    const int MAX_WIDTH = 1000;
+    if (target > MAX_WIDTH) {
+        // For very large targets, use greedy as fallback
+        return solveGreedy(targetWidth);
+    }
+
+    // DP table: dp[w] = minimum segments to achieve exactly width w
+    // Initialize with large value (impossible)
+    const int INF = 999999;
+    std::vector<int> dp(target + 100, INF);  // Extra space for overage
+    std::vector<int> parent(target + 100, -1);  // For backtracking
+
+    // Base case: 0 width requires 0 segments
+    dp[0] = 0;
+
+    // Fill DP table
+    for (int w = 0; w <= target + 50; w++) {
+        if (dp[w] == INF) continue;  // Unreachable state
+
+        // Try adding each segment
+        for (int segment : m_availableSegments) {
+            int newWidth = w + segment;
+            if (newWidth > target + 50) continue;  // Don't go too far over
+
+            // Update if this path uses fewer segments
+            if (dp[w] + 1 < dp[newWidth]) {
+                dp[newWidth] = dp[w] + 1;
+                parent[newWidth] = w;  // Store previous width for backtracking
+            }
+        }
+    }
+
+    // Find best solution: smallest width >= target with minimum segments
+    int bestWidth = -1;
+    int minSegments = INF;
+    int minWaste = INF;
+
+    for (int w = target; w <= target + 50; w++) {
+        if (dp[w] == INF) continue;
+
+        int segments = dp[w];
+        int waste = w - target;
+
+        // Prioritize: fewer segments, then less waste
+        if (segments < minSegments ||
+            (segments == minSegments && waste < minWaste)) {
+            bestWidth = w;
+            minSegments = segments;
+            minWaste = waste;
+        }
+    }
+
+    // No solution found
+    if (bestWidth == -1) {
+        return std::vector<int>();
+    }
+
+    // Backtrack to reconstruct solution
+    std::vector<int> solution;
+    int currentWidth = bestWidth;
+
+    while (currentWidth > 0) {
+        int prevWidth = parent[currentWidth];
+        if (prevWidth == -1) break;
+
+        int segment = currentWidth - prevWidth;
+        solution.push_back(segment);
+
+        currentWidth = prevWidth;
+    }
+
+    // Sort solution for consistency (largest first)
+    std::sort(solution.rbegin(), solution.rend());
+
+    return solution;
+}
+
+std::vector<int> ABAConstraintAnalyzer::solveGreedy(
+    double targetWidth
+) {
+    // Greedy fallback for large targets
+    // (Extracted from old implementation)
 
     std::vector<int> solution;
 
-    // Round target to integer for segment matching
     int target = static_cast<int>(std::ceil(targetWidth));
 
     // Greedy approach: Use largest segments first
@@ -140,35 +238,16 @@ std::vector<int> ABAConstraintAnalyzer::solveSubsetSum(
         }
 
         if (remaining == 0) {
-            break;  // Perfect match found
+            break;
         }
     }
 
-    // Check if we covered the target
-    int totalCovered = 0;
-    for (int seg : solution) {
-        totalCovered += seg;
+    // If still short, add smallest segment
+    if (remaining > 0 && !segments.empty()) {
+        solution.push_back(segments.back());
     }
 
-    if (totalCovered < target) {
-        // Need to add smallest segment to reach target
-        if (!segments.empty()) {
-            solution.push_back(segments.back());  // Add smallest
-        }
-    }
-
-    // Verify solution covers target
-    totalCovered = 0;
-    for (int seg : solution) {
-        totalCovered += seg;
-    }
-
-    if (totalCovered >= target) {
-        return solution;
-    }
-
-    // No solution found
-    return std::vector<int>();
+    return solution;
 }
 
 bool ABAConstraintAnalyzer::isBoxClosing(

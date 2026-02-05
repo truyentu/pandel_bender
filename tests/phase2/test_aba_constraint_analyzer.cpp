@@ -204,3 +204,249 @@ TEST_CASE("ABAConstraintAnalyzer - clearance calculation", "[phase2][aba][basic]
     // Required width should be >= bend length + clearance
     REQUIRE(constraint.requiredWidth >= constraint.bendLength + constraint.clearance);
 }
+
+// ============================================================================
+// Task 22: Dynamic Programming Subset Sum Solver
+// ============================================================================
+
+TEST_CASE("Subset sum - exact match with single segment", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;  // Exact match with 100mm segment
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    // Should find solution
+    REQUIRE(constraint.feasible == true);
+    REQUIRE(!constraint.segmentSolution.empty());
+
+    // Should prefer exact match (single 100mm segment)
+    // May also include clearance, so could be 100 + 25 = 125 or similar
+    REQUIRE(constraint.totalSegments >= 1);
+}
+
+TEST_CASE("Subset sum - exact match with multiple segments", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 275.0;  // 275 = 100 + 175 or 150 + 125 or 100 + 100 + 75
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    // Should find solution
+    REQUIRE(constraint.feasible == true);
+
+    // Verify total width covers required width
+    REQUIRE(constraint.totalWidth >= constraint.requiredWidth);
+
+    // Should minimize number of segments
+    REQUIRE(constraint.totalSegments >= 2);
+    REQUIRE(constraint.totalSegments <= 4);  // Should not use too many
+}
+
+TEST_CASE("Subset sum - minimize segment count", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 200.0;  // Exact match with single 200mm segment
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    REQUIRE(constraint.feasible == true);
+
+    // Should prefer single 200mm segment over multiple smaller ones
+    // With clearance, might need 200 + 25 = 225 total
+    // Best: 200 + 25 (2 segments)
+    REQUIRE(constraint.totalSegments <= 3);
+}
+
+TEST_CASE("Subset sum - small bend uses smallest segments", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 30.0;  // Small bend
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    REQUIRE(constraint.feasible == true);
+
+    // Should use 25mm segment (smallest available)
+    // With clearance ~10mm: need 40mm → 25 + 25 = 50mm
+    bool hasSmallSegment = false;
+    for (int seg : constraint.segmentSolution) {
+        if (seg == 25 || seg == 50) {
+            hasSmallSegment = true;
+        }
+    }
+    REQUIRE(hasSmallSegment == true);
+}
+
+TEST_CASE("Subset sum - minimize waste", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 175.0;  // Exact match with 175mm segment
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    REQUIRE(constraint.feasible == true);
+
+    // Calculate waste (overage)
+    double waste = constraint.totalWidth - constraint.requiredWidth;
+
+    // Waste should be minimal (< 25mm for most cases)
+    REQUIRE(waste >= 0.0);  // Should not be negative
+    REQUIRE(waste < 50.0);  // Should not have excessive waste
+}
+
+TEST_CASE("Subset sum - large bend requires multiple segments", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 500.0;  // Large bend
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    REQUIRE(constraint.feasible == true);
+
+    // Should use multiple large segments
+    // 500 + ~10mm clearance = 510mm
+    // Best: 200 + 200 + 100 + 25 = 525mm (4 segments)
+    // Or: 200 + 200 + 125 = 525mm (3 segments)
+    REQUIRE(constraint.totalSegments >= 3);
+
+    // Total should cover required width
+    REQUIRE(constraint.totalWidth >= constraint.requiredWidth);
+}
+
+TEST_CASE("Subset sum - DP optimization preference", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 150.0;  // Can use: 150 (1 seg) or 100+50 (2 seg) or 75+75 (2 seg)
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    REQUIRE(constraint.feasible == true);
+
+    // With clearance ~10mm, need 160mm
+    // Optimal: 150 + 25 = 175mm (2 segments, waste = 15mm)
+    // Alternative: 100 + 75 = 175mm (2 segments, waste = 15mm)
+    // Alternative: 200mm (1 segment, waste = 40mm) - less optimal due to waste
+
+    // Should have reasonable solution
+    REQUIRE(constraint.totalSegments <= 3);
+
+    // Should not have excessive waste
+    double waste = constraint.totalWidth - constraint.requiredWidth;
+    REQUIRE(waste < 50.0);
+}
+
+TEST_CASE("Subset sum - consistent results", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    // Analyze multiple times
+    auto c1 = analyzer.analyze(bends);
+    auto c2 = analyzer.analyze(bends);
+
+    // Results should be identical (deterministic)
+    REQUIRE(c1.size() == c2.size());
+    REQUIRE(c1[0].totalSegments == c2[0].totalSegments);
+    REQUIRE(c1[0].totalWidth == c2[0].totalWidth);
+    REQUIRE(c1[0].feasible == c2[0].feasible);
+}
+
+TEST_CASE("Subset sum - performance with DP", "[phase2][aba][subsetsum]") {
+    ABAConstraintAnalyzer analyzer;
+
+    // Test with multiple bends to measure DP performance
+    std::vector<BendFeature> bends;
+    for (int i = 0; i < 10; i++) {
+        BendFeature bend;
+        bend.id = i;
+        bend.angle = 90.0;
+        bend.length = 50.0 + i * 20.0;  // Varying lengths
+        bends.push_back(bend);
+    }
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 10);
+
+    auto stats = analyzer.getStatistics();
+
+    // Should have timing data
+    REQUIRE(stats.analysisTimeMs >= 0.0);
+    REQUIRE(stats.avgBendTimeMs >= 0.0);
+
+    // DP should still be fast (< 5ms per bend on average)
+    REQUIRE(stats.avgBendTimeMs < 5.0);
+
+    // All should be feasible
+    REQUIRE(stats.feasibleCount == 10);
+    REQUIRE(stats.infeasibleCount == 0);
+}
