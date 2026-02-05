@@ -2,6 +2,10 @@
 #include <chrono>
 #include <cmath>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 namespace openpanelcam {
 namespace phase2 {
 
@@ -122,6 +126,9 @@ std::vector<DeadZone> GraspConstraintGenerator::calculateDeadZones(
         // Project flange to base plane
         zone.polygon = projectFlangeToBasePlane(*bendPtr);
 
+        // Expand by safety margin
+        zone.polygon = expandPolygon(zone.polygon, zone.safetyMargin);
+
         deadZones.push_back(zone);
     }
 
@@ -131,31 +138,90 @@ std::vector<DeadZone> GraspConstraintGenerator::calculateDeadZones(
 Polygon2D GraspConstraintGenerator::projectFlangeToBasePlane(
     const phase1::BendFeature& bend
 ) {
-    // Simplified projection: Create rectangle at bend line
-    // Real implementation would use OCCT to project bent flange
+    // Project standing flange to base plane (Z=0)
+    // Footprint depends on bend angle
 
     Polygon2D poly;
 
     double halfLength = bend.length / 2.0;
-    double flangeWidth = 50.0;  // Assume 50mm flange width after bending
+
+    // Flange height depends on bend angle and original flange width
+    // Assuming original flange width = 50mm
+    double originalFlangeWidth = 50.0;
+
+    // For 90° bend: full width projects to base
+    // For 45° bend: sin(45°) * width projects
+    // For 0° bend: no projection (flat)
+    double angleRad = bend.angle * M_PI / 180.0;
+    double projectedWidth = originalFlangeWidth * std::sin(angleRad);
+
+    // Minimum footprint even for small angles (safety)
+    if (projectedWidth < 10.0 && bend.angle > 5.0) {
+        projectedWidth = 10.0;
+    }
 
     // Create rectangle perpendicular to bend line
     // Centered at bend position
+
+    // Determine orientation based on bend direction
+    // If bend line is along Y (direction.y ≈ 1), flange extends in X
+    // If bend line is along X (direction.x ≈ 1), flange extends in Y
+
+    double dirX = bend.direction.x;
+    double dirY = bend.direction.y;
+    double perpX = -dirY;  // Perpendicular direction
+    double perpY = dirX;
+
+    // Normalize perpendicular vector
+    double perpLen = std::sqrt(perpX*perpX + perpY*perpY);
+    if (perpLen > 0.001) {
+        perpX /= perpLen;
+        perpY /= perpLen;
+    } else {
+        // Default to X direction if bend direction is degenerate
+        perpX = 1.0;
+        perpY = 0.0;
+    }
+
+    // Direction along bend line
+    double tanX = dirX;
+    double tanY = dirY;
+    double tanLen = std::sqrt(tanX*tanX + tanY*tanY);
+    if (tanLen > 0.001) {
+        tanX /= tanLen;
+        tanY /= tanLen;
+    } else {
+        // Default to Y direction
+        tanX = 0.0;
+        tanY = 1.0;
+    }
+
+    // Four corners of flange footprint
+    double hw = projectedWidth / 2.0;  // Half width
+    double hl = halfLength;             // Half length
+
+    // Corner 1: -width/2, -length/2
     poly.vertices.push_back(Point2D(
-        bend.position.x - flangeWidth/2,
-        bend.position.y - halfLength
+        bend.position.x - perpX * hw - tanX * hl,
+        bend.position.y - perpY * hw - tanY * hl
     ));
+
+    // Corner 2: +width/2, -length/2
     poly.vertices.push_back(Point2D(
-        bend.position.x + flangeWidth/2,
-        bend.position.y - halfLength
+        bend.position.x + perpX * hw - tanX * hl,
+        bend.position.y + perpY * hw - tanY * hl
     ));
+
+    // Corner 3: +width/2, +length/2
     poly.vertices.push_back(Point2D(
-        bend.position.x + flangeWidth/2,
-        bend.position.y + halfLength
+        bend.position.x + perpX * hw + tanX * hl,
+        bend.position.y + perpY * hw + tanY * hl
     ));
+
+    // Corner 4: -width/2, +length/2
     poly.vertices.push_back(Point2D(
-        bend.position.x - flangeWidth/2,
-        bend.position.y + halfLength
+        bend.position.x - perpX * hw + tanX * hl,
+        bend.position.y - perpY * hw + tanY * hl
     ));
 
     return poly;
@@ -309,6 +375,46 @@ Point2D GraspConstraintGenerator::calculateCenterOfMass(
     }
 
     return Point2D(comX, comY);
+}
+
+Polygon2D GraspConstraintGenerator::expandPolygon(
+    const Polygon2D& poly,
+    double margin
+) {
+    // Simplified polygon expansion using bounding box method
+    // Real implementation would use polygon offsetting algorithms
+
+    if (poly.vertices.empty()) {
+        return poly;
+    }
+
+    // Find bounding box
+    double minX = poly.vertices[0].x;
+    double maxX = poly.vertices[0].x;
+    double minY = poly.vertices[0].y;
+    double maxY = poly.vertices[0].y;
+
+    for (const auto& v : poly.vertices) {
+        if (v.x < minX) minX = v.x;
+        if (v.x > maxX) maxX = v.x;
+        if (v.y < minY) minY = v.y;
+        if (v.y > maxY) maxY = v.y;
+    }
+
+    // Expand bounding box by margin
+    minX -= margin;
+    maxX += margin;
+    minY -= margin;
+    maxY += margin;
+
+    // Create expanded rectangle
+    Polygon2D expanded;
+    expanded.vertices.push_back(Point2D(minX, minY));
+    expanded.vertices.push_back(Point2D(maxX, minY));
+    expanded.vertices.push_back(Point2D(maxX, maxY));
+    expanded.vertices.push_back(Point2D(minX, maxY));
+
+    return expanded;
 }
 
 } // namespace phase2

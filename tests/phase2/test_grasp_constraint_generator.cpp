@@ -97,3 +97,223 @@ TEST_CASE("GraspConstraintGenerator - statistics tracking", "[phase2][grasp][bas
     REQUIRE(stats.validGripCount >= 0);
     REQUIRE(stats.invalidGripCount >= 0);
 }
+
+// ============================================================================
+// Task 17: Dead Zone Calculation Improvements
+// ============================================================================
+
+TEST_CASE("DeadZone - area calculation from polygon", "[phase2][grasp][deadzone]") {
+    DeadZone zone;
+    zone.id = 0;
+    zone.type = DeadZoneType::STANDING_FLANGE;
+
+    // Create simple square 10x10mm
+    zone.polygon.vertices = {
+        Point2D(0, 0),
+        Point2D(10, 0),
+        Point2D(10, 10),
+        Point2D(0, 10)
+    };
+
+    double area = zone.area();
+    REQUIRE(area == 100.0);  // 10 * 10
+}
+
+TEST_CASE("DeadZone - contains point test", "[phase2][grasp][deadzone]") {
+    DeadZone zone;
+    zone.polygon.vertices = {
+        Point2D(0, 0),
+        Point2D(10, 0),
+        Point2D(10, 10),
+        Point2D(0, 10)
+    };
+
+    // Inside
+    REQUIRE(zone.contains(Point2D(5, 5)) == true);
+
+    // Outside
+    REQUIRE(zone.contains(Point2D(15, 5)) == false);
+    REQUIRE(zone.contains(Point2D(5, 15)) == false);
+
+    // Edge cases
+    REQUIRE(zone.contains(Point2D(0, 0)) == true);  // Vertex
+    REQUIRE(zone.contains(Point2D(5, 0)) == true);   // Edge
+}
+
+TEST_CASE("Dead zone - 90 degree bend creates accurate footprint", "[phase2][grasp][deadzone]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+    bend.position.x = 50.0;
+    bend.position.y = 50.0;
+    bend.position.z = 0.0;
+    bend.direction.x = 0.0;
+    bend.direction.y = 1.0;  // Along Y
+    bend.normal.x = 0.0;
+    bend.normal.y = 0.0;
+    bend.normal.z = 1.0;     // Rotate around Z
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };  // Already bent
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Should have 1 dead zone
+    REQUIRE(constraint.deadZones.size() == 1);
+
+    const auto& dz = constraint.deadZones[0];
+
+    // Verify dead zone properties
+    REQUIRE(dz.type == DeadZoneType::STANDING_FLANGE);
+    REQUIRE(dz.causedByBend == 0);
+    REQUIRE(dz.safetyMargin == 5.0);
+
+    // Dead zone should have rectangular footprint
+    REQUIRE(dz.polygon.vertices.size() == 4);
+
+    // Area should be (flange_width + 2*safety_margin) * (bend_length + 2*safety_margin)
+    // Flange width = 50mm, safety margin = 5mm, length = 100mm
+    // Projected width = 50 * sin(90°) = 50mm
+    // With margin: (50 + 10) * (100 + 10) = 60 * 110 = 6600mm²
+    double area = dz.area();
+    REQUIRE(area > 0.0);
+    REQUIRE(area <= 7000.0);  // Should be around 6600mm²
+    REQUIRE(area >= 6000.0);  // Lower bound
+}
+
+TEST_CASE("Dead zone - 45 degree bend creates smaller footprint", "[phase2][grasp][deadzone]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 45.0;  // Smaller angle
+    bend.length = 100.0;
+    bend.position.x = 50.0;
+    bend.position.y = 50.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Should still have dead zone, but smaller
+    REQUIRE(constraint.deadZones.size() == 1);
+
+    double area45 = constraint.deadZones[0].area();
+
+    // Compare with 90 degree
+    bend.angle = 90.0;
+    auto constraint90 = generator.analyze(bends, bentBends);
+    double area90 = constraint90.deadZones[0].area();
+
+    // 45 degree should have smaller footprint than 90 degree
+    // (because flange doesn't stand as tall)
+    REQUIRE(area45 <= area90);
+}
+
+TEST_CASE("Dead zone - safety margin expands footprint", "[phase2][grasp][deadzone]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+    bend.position.x = 50.0;
+    bend.position.y = 50.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Dead zone should have safety margin
+    REQUIRE(constraint.deadZones[0].safetyMargin > 0.0);
+
+    // Polygon should be expanded by safety margin
+    // (Check by verifying polygon is larger than base flange)
+    double dzArea = constraint.deadZones[0].area();
+
+    // Base flange area (50mm x 100mm)
+    double baseFlangeArea = 50.0 * 100.0;
+
+    // Dead zone should be larger due to safety margin
+    REQUIRE(dzArea >= baseFlangeArea);
+}
+
+TEST_CASE("Dead zone - multiple bends create multiple zones", "[phase2][grasp][deadzone]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature b0, b1;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 100.0;
+    b0.position.x = 50.0;
+    b0.position.y = 50.0;
+
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 100.0;
+    b1.position.x = 150.0;  // Different position
+    b1.position.y = 50.0;
+
+    std::vector<BendFeature> bends = { b0, b1 };
+    std::vector<int> bentBends = { 0, 1 };  // Both bent
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Should have 2 dead zones
+    REQUIRE(constraint.deadZones.size() == 2);
+
+    // Each should be from different bend
+    REQUIRE(constraint.deadZones[0].causedByBend == 0);
+    REQUIRE(constraint.deadZones[1].causedByBend == 1);
+
+    // Both should be STANDING_FLANGE type
+    REQUIRE(constraint.deadZones[0].type == DeadZoneType::STANDING_FLANGE);
+    REQUIRE(constraint.deadZones[1].type == DeadZoneType::STANDING_FLANGE);
+}
+
+TEST_CASE("Dead zone - partial bend state", "[phase2][grasp][deadzone]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature b0, b1, b2;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 100.0;
+
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 100.0;
+
+    b2.id = 2;
+    b2.angle = 90.0;
+    b2.length = 100.0;
+
+    std::vector<BendFeature> bends = { b0, b1, b2 };
+    std::vector<int> bentBends = { 0, 2 };  // Only 0 and 2 bent, not 1
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Should have 2 dead zones (only for bent bends)
+    REQUIRE(constraint.deadZones.size() == 2);
+
+    // Should be from bends 0 and 2
+    bool hasZone0 = false;
+    bool hasZone2 = false;
+    bool hasZone1 = false;
+
+    for (const auto& dz : constraint.deadZones) {
+        if (dz.causedByBend == 0) hasZone0 = true;
+        if (dz.causedByBend == 1) hasZone1 = true;
+        if (dz.causedByBend == 2) hasZone2 = true;
+    }
+
+    REQUIRE(hasZone0 == true);
+    REQUIRE(hasZone2 == true);
+    REQUIRE(hasZone1 == false);  // Bend 1 not bent
+}

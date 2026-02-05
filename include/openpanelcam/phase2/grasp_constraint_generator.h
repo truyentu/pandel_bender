@@ -166,6 +166,21 @@ private:
         const std::vector<phase1::BendFeature>& bends,
         const std::vector<int>& bentBends
     );
+
+    /**
+     * @brief Expand polygon by safety margin
+     *
+     * Creates buffer zone around polygon by offsetting edges outward.
+     * Simplified implementation uses bounding box expansion.
+     *
+     * @param poly Original polygon
+     * @param margin Expansion distance (mm)
+     * @return Expanded polygon
+     */
+    Polygon2D expandPolygon(
+        const Polygon2D& poly,
+        double margin
+    );
 };
 
 } // namespace phase2
