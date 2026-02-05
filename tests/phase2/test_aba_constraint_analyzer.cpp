@@ -450,3 +450,242 @@ TEST_CASE("Subset sum - performance with DP", "[phase2][aba][subsetsum]") {
     REQUIRE(stats.feasibleCount == 10);
     REQUIRE(stats.infeasibleCount == 0);
 }
+
+// ============================================================================
+// Task 23: ABA Tool Width Refinements
+// ============================================================================
+
+TEST_CASE("Tool width - clearance increases with angle", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature b45, b90;
+
+    b45.id = 0;
+    b45.angle = 45.0;
+    b45.length = 100.0;
+
+    b90.id = 1;
+    b90.angle = 90.0;
+    b90.length = 100.0;
+
+    std::vector<BendFeature> bends = { b45, b90 };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 2);
+
+    // 90° bend should require more clearance than 45°
+    REQUIRE(constraints[1].clearance > constraints[0].clearance);
+
+    // Required width should also be larger for 90°
+    REQUIRE(constraints[1].requiredWidth > constraints[0].requiredWidth);
+}
+
+TEST_CASE("Tool width - obtuse angles", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 135.0;  // Obtuse angle
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    // Should handle obtuse angles
+    REQUIRE(constraint.clearance >= 5.0);
+    REQUIRE(constraint.requiredWidth >= constraint.bendLength);
+}
+
+TEST_CASE("Tool width - negative angles", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = -90.0;  // Negative (opposite direction)
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    // Should handle negative angles (use absolute value)
+    REQUIRE(constraint.clearance >= 5.0);
+    REQUIRE(constraint.requiredWidth >= constraint.bendLength);
+}
+
+TEST_CASE("Tool width - clearance bounds", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    // Test various angles
+    std::vector<double> angles = { 15.0, 30.0, 45.0, 60.0, 90.0, 120.0, 150.0 };
+
+    for (double angle : angles) {
+        BendFeature bend;
+        bend.id = 0;
+        bend.angle = angle;
+        bend.length = 100.0;
+
+        auto constraints = analyzer.analyze({ bend });
+
+        REQUIRE(constraints.size() == 1);
+
+        const auto& constraint = constraints[0];
+
+        // Clearance should be within reasonable bounds
+        REQUIRE(constraint.clearance >= 5.0);   // Minimum
+        REQUIRE(constraint.clearance <= 15.0);  // Maximum
+    }
+}
+
+TEST_CASE("Tool width - required width formula", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 150.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    // Required width = bend length + clearance
+    double expectedWidth = constraint.bendLength + constraint.clearance;
+    REQUIRE(constraint.requiredWidth == Approx(expectedWidth).epsilon(0.01));
+}
+
+TEST_CASE("Tool width - segment coverage verification", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 200.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    if (constraint.feasible) {
+        // Total width from segments should cover required width
+        REQUIRE(constraint.totalWidth >= constraint.requiredWidth);
+
+        // Should not have excessive overage (< 50mm)
+        double overage = constraint.totalWidth - constraint.requiredWidth;
+        REQUIRE(overage >= 0.0);
+        REQUIRE(overage < 50.0);
+    }
+}
+
+TEST_CASE("Tool width - very small bends", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 10.0;  // Very small
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    // Should still find solution
+    REQUIRE(constraint.feasible == true);
+
+    // Required width should be reasonable
+    REQUIRE(constraint.requiredWidth >= 10.0);
+    REQUIRE(constraint.requiredWidth <= 50.0);
+
+    // Should use smallest segments
+    REQUIRE(constraint.totalSegments >= 1);
+}
+
+TEST_CASE("Tool width - very large bends", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 800.0;  // Very large
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    // Should find solution (may use greedy fallback)
+    REQUIRE(constraint.feasible == true);
+
+    // Should use multiple segments
+    REQUIRE(constraint.totalSegments >= 4);
+
+    // Total should cover required width
+    REQUIRE(constraint.totalWidth >= constraint.requiredWidth);
+}
+
+TEST_CASE("Tool width - clearance consistency", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    // Analyze multiple times
+    auto c1 = analyzer.analyze(bends);
+    auto c2 = analyzer.analyze(bends);
+
+    // Clearance should be identical (deterministic)
+    REQUIRE(c1[0].clearance == c2[0].clearance);
+    REQUIRE(c1[0].requiredWidth == c2[0].requiredWidth);
+}
+
+TEST_CASE("Tool width - zero angle edge case", "[phase2][aba][width]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 0.0;  // Flat (no bend)
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& constraint = constraints[0];
+
+    // Should still calculate clearance (minimum value)
+    REQUIRE(constraint.clearance >= 5.0);
+
+    // Required width should be reasonable
+    REQUIRE(constraint.requiredWidth >= constraint.bendLength);
+}

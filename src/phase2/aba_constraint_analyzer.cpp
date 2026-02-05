@@ -87,29 +87,82 @@ std::vector<ABAConstraint> ABAConstraintAnalyzer::analyze(
 double ABAConstraintAnalyzer::calculateRequiredWidth(
     const phase1::BendFeature& bend
 ) {
-    // Required width = bend length + clearance
+    // Required ABA Tool Width Calculation
+    // ====================================
+    //
+    // Required width ensures ABA segments can safely perform the bend
+    // without tool interference or material collision.
+    //
+    // Components:
+    // 1. Bend length: Actual length of bend line
+    // 2. Clearance: Safety margin (angle-dependent)
+    //
+    // Total = BendLength + Clearance
+    //
+    // Example:
+    // - 100mm bend at 90° → 100 + 10 = 110mm required
+    // - 200mm bend at 45° → 200 + 7.5 = 207.5mm required
+    // - 150mm bend at 135° → 150 + 12.5 = 162.5mm required
+
     double clearance = calculateClearance(bend);
-    return bend.length + clearance;
+    double requiredWidth = bend.length + clearance;
+
+    return requiredWidth;
 }
 
 double ABAConstraintAnalyzer::calculateClearance(
     const phase1::BendFeature& bend
 ) {
-    // Clearance calculation based on bend angle
-    // Larger angles require more clearance for tool access
+    // ABA Tool Clearance Calculation
+    // ===============================
+    //
+    // Clearance is additional width needed beyond bend length for:
+    // 1. Tool access and positioning
+    // 2. Material spring-back compensation
+    // 3. Flange interference avoidance
+    // 4. Tool geometry constraints
+    //
+    // Factors affecting clearance:
+    // - Bend angle: Larger angles need more clearance
+    // - Material thickness: Thicker material needs more space
+    // - Bend radius: Affects flange projection
+    // - Tool geometry: Physical constraints of ABA segments
+    //
+    // Formula derivation:
+    // - Base clearance: 10mm (minimum tool access)
+    // - Angle factor: |angle| / 90° (normalized 0-2 range)
+    // - Total: base × (0.5 + 0.5 × angleFactor)
+    //
+    // Result range: [5mm, 15mm]
+    // - 0° bend: 5mm (minimum, flat state)
+    // - 45° bend: 7.5mm (moderate)
+    // - 90° bend: 10mm (standard right angle)
+    // - 135° bend: 12.5mm (obtuse)
+    // - 180° bend: 15mm (maximum, sharp fold)
 
-    // Base clearance
-    double baseClearance = 10.0;  // mm
+    // Base clearance (minimum tool access requirement)
+    const double BASE_CLEARANCE = 10.0;  // mm
 
-    // Angle factor (90° bend needs more clearance than 45°)
-    double angleFactor = std::abs(bend.angle) / 90.0;
+    // Absolute angle for calculation (handle negative bends)
+    double absAngle = std::abs(bend.angle);
 
-    // Total clearance
-    double clearance = baseClearance * (0.5 + 0.5 * angleFactor);
+    // Angle factor: normalized to 90° reference
+    // 0° → 0.0, 45° → 0.5, 90° → 1.0, 180° → 2.0
+    double angleFactor = absAngle / 90.0;
 
-    // Minimum clearance
-    if (clearance < 5.0) {
-        clearance = 5.0;
+    // Apply clearance formula
+    // Linear interpolation: 50% base at 0°, 100% base at 90°, 150% at 180°
+    double clearance = BASE_CLEARANCE * (0.5 + 0.5 * angleFactor);
+
+    // Enforce bounds
+    const double MIN_CLEARANCE = 5.0;   // mm (absolute minimum)
+    const double MAX_CLEARANCE = 15.0;  // mm (practical maximum)
+
+    if (clearance < MIN_CLEARANCE) {
+        clearance = MIN_CLEARANCE;
+    }
+    if (clearance > MAX_CLEARANCE) {
+        clearance = MAX_CLEARANCE;
     }
 
     return clearance;
