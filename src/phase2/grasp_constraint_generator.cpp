@@ -408,29 +408,64 @@ bool GraspConstraintGenerator::validateGripPhysics(
     const std::vector<phase1::BendFeature>& bends,
     const std::vector<int>& bentBends
 ) {
-    // Simplified physics validation
+    // Grip physics validation
+    // =======================
+    //
+    // Validates that the proposed grip rectangle is physically feasible
+    // for holding the bent part during subsequent bending operations.
+    //
+    // Validation criteria:
+    // 1. Minimum grip area (friction requirement)
+    // 2. Center of mass proximity (stability requirement)
+    // 3. Grip aspect ratio (practicality requirement)
+    //
+    // Physics assumptions:
+    // - Friction coefficient μ ≈ 0.3 (steel on rubber pads)
+    // - Static friction force F = μ × N (normal force from grip)
+    // - Minimum area ensures sufficient normal force
+    // - COM proximity ensures low torque/moment
 
-    // Criterion 1: Grip area must be > 100mm²
+    // Criterion 1: Minimum grip area
+    // Required for sufficient friction to hold part
+    // Minimum 100mm² based on typical gripper specifications
     double gripArea = gripRect.area;
-    if (gripArea < 100.0) {
-        return false;
+    const double MIN_GRIP_AREA = 100.0;  // mm²
+
+    if (gripArea < MIN_GRIP_AREA) {
+        return false;  // Insufficient friction
     }
 
-    // Criterion 2: Center of mass should be within grip region
+    // Criterion 2: Center of mass proximity
+    // COM should be reasonably close to grip center
+    // If COM is far from grip, part may tilt or slip
     Point2D com = calculateCenterOfMass(bends, bentBends);
     Point2D gripCenter = gripRect.center;
 
-    // Distance from COM to grip center
     double dx = com.x - gripCenter.x;
     double dy = com.y - gripCenter.y;
-    double distance = std::sqrt(dx*dx + dy*dy);
+    double comDistance = std::sqrt(dx*dx + dy*dy);
 
-    // COM should be within 100mm of grip center (simplified)
-    if (distance > 100.0) {
-        return false;
+    // Maximum allowable COM offset: 100mm
+    // Beyond this, moment arm too large → instability risk
+    const double MAX_COM_OFFSET = 100.0;  // mm
+
+    if (comDistance > MAX_COM_OFFSET) {
+        return false;  // Unstable grip
     }
 
-    // Physics valid
+    // Criterion 3: Grip aspect ratio
+    // Extremely elongated grips (very high aspect ratio) are impractical
+    // Example: 200mm × 1mm grip is difficult to achieve with standard tooling
+    double aspectRatio = std::max(gripRect.width, gripRect.height) /
+                         std::min(gripRect.width, gripRect.height);
+
+    const double MAX_ASPECT_RATIO = 10.0;  // Width/Height ratio
+
+    if (aspectRatio > MAX_ASPECT_RATIO) {
+        return false;  // Impractical grip geometry
+    }
+
+    // All criteria satisfied
     return true;
 }
 
@@ -438,32 +473,76 @@ Point2D GraspConstraintGenerator::calculateCenterOfMass(
     const std::vector<phase1::BendFeature>& bends,
     const std::vector<int>& bentBends
 ) {
-    // Simplified COM calculation
-    // Real implementation would calculate based on actual bent geometry
+    // Center of Mass calculation for bent sheet metal part
+    // ====================================================
+    //
+    // Assumptions:
+    // - Uniform material thickness and density
+    // - Sheet metal properties: constant thickness t
+    // - Mass is proportional to area (since m = ρ × t × A)
+    // - COM is area-weighted centroid of all sections
+    //
+    // Simplified approach:
+    // - Flat state: COM at geometric center of sheet
+    // - Bent state: COM shifts based on bent flange positions
+    // - Weight each bend position by its flange area
+    //
+    // Real implementation would:
+    // - Calculate actual 3D flange positions after bending
+    // - Project to base plane
+    // - Compute area-weighted centroid
+    // - Account for material thickness effects
+
+    const double SHEET_SIZE = 500.0;  // mm (assumed square sheet)
 
     if (bends.empty()) {
-        return Point2D(0, 0);
+        // No bends defined - use sheet center
+        return Point2D(SHEET_SIZE / 2.0, SHEET_SIZE / 2.0);
     }
 
-    // For flat state, COM is at sheet center
     if (bentBends.empty()) {
-        return Point2D(250.0, 250.0);  // Center of 500x500 sheet
+        // Flat state - COM at sheet geometric center
+        return Point2D(SHEET_SIZE / 2.0, SHEET_SIZE / 2.0);
     }
 
-    // For bent state, shift COM slightly based on bend positions
-    double comX = 250.0;
-    double comY = 250.0;
+    // Bent state - calculate weighted centroid
+    // Start with base sheet contribution
+    double totalArea = SHEET_SIZE * SHEET_SIZE;
+    double weightedX = (SHEET_SIZE / 2.0) * totalArea;
+    double weightedY = (SHEET_SIZE / 2.0) * totalArea;
 
-    // Average bend positions (simplified)
+    // Add contribution from each bent flange
+    // Each flange adds mass at its position
+    const double FLANGE_WIDTH = 50.0;  // mm (assumed)
+
     for (int bentId : bentBends) {
+        // Find the bend feature
+        const phase1::BendFeature* bendPtr = nullptr;
         for (const auto& bend : bends) {
             if (bend.id == bentId) {
-                comX = (comX + bend.position.x) / 2.0;
-                comY = (comY + bend.position.y) / 2.0;
+                bendPtr = &bend;
                 break;
             }
         }
+
+        if (bendPtr == nullptr) continue;
+
+        // Flange area
+        double flangeArea = FLANGE_WIDTH * bendPtr->length;
+
+        // Flange centroid (at bend line position)
+        double flangeX = bendPtr->position.x;
+        double flangeY = bendPtr->position.y;
+
+        // Add weighted contribution
+        weightedX += flangeX * flangeArea;
+        weightedY += flangeY * flangeArea;
+        totalArea += flangeArea;
     }
+
+    // Calculate area-weighted centroid
+    double comX = weightedX / totalArea;
+    double comY = weightedY / totalArea;
 
     return Point2D(comX, comY);
 }

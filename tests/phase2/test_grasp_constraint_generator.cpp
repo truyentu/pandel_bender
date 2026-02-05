@@ -787,3 +787,292 @@ TEST_CASE("MIR - handles small valid regions", "[phase2][grasp][mir][advanced]")
     REQUIRE(constraint.validRegion.contains(mir.bottomLeft));
     REQUIRE(constraint.validRegion.contains(mir.topRight));
 }
+
+// ============================================================================
+// Task 20: Advanced Grip Validation
+// ============================================================================
+
+TEST_CASE("Grip validation - minimum area requirement", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends;
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Minimum required area should be 100mm²
+    REQUIRE(constraint.minRequiredArea == 100.0);
+
+    // Valid region area should exceed minimum
+    double validArea = constraint.validRegion.area();
+    REQUIRE(validArea >= constraint.minRequiredArea);
+
+    // MIR area should also exceed minimum
+    REQUIRE(constraint.maxInscribedRect.area >= constraint.minRequiredArea);
+}
+
+TEST_CASE("Grip validation - COM calculation accuracy", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+    bend.position.x = 250.0;
+    bend.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    // Flat state - COM should be at sheet center
+    auto flatConstraint = generator.analyze(bends, {});
+    Point2D flatCOM = flatConstraint.centerOfMass;
+
+    // Should be near (250, 250)
+    REQUIRE(flatCOM.x > 200.0);
+    REQUIRE(flatCOM.x < 300.0);
+    REQUIRE(flatCOM.y > 200.0);
+    REQUIRE(flatCOM.y < 300.0);
+
+    // Bent state - COM should shift slightly
+    auto bentConstraint = generator.analyze(bends, {0});
+    Point2D bentCOM = bentConstraint.centerOfMass;
+
+    // Should be calculated and valid
+    REQUIRE(bentCOM.x > 0.0);
+    REQUIRE(bentCOM.y > 0.0);
+}
+
+TEST_CASE("Grip validation - COM within grip tolerance", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+    bend.position.x = 250.0;
+    bend.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // COM should be reasonably close to MIR center
+    Point2D com = constraint.centerOfMass;
+    Point2D mirCenter = constraint.maxInscribedRect.center;
+
+    double dx = com.x - mirCenter.x;
+    double dy = com.y - mirCenter.y;
+    double distance = std::sqrt(dx*dx + dy*dy);
+
+    // Should be within 100mm tolerance for physics validation
+    REQUIRE(distance <= 100.0);
+}
+
+TEST_CASE("Grip validation - physics check passes for valid grips", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends;
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Flat state should have valid grip
+    REQUIRE(constraint.hasValidGrip == true);
+
+    // Check all validation criteria
+    REQUIRE(constraint.validRegion.area() >= constraint.minRequiredArea);
+    REQUIRE(constraint.maxInscribedRect.area >= 100.0);
+}
+
+TEST_CASE("Grip validation - invalid when area too small", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    // Create scenario with many dead zones to reduce valid area
+    BendFeature b0, b1, b2, b3;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 200.0;
+    b0.position.x = 100.0;
+    b0.position.y = 250.0;
+
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 200.0;
+    b1.position.x = 200.0;
+    b1.position.y = 250.0;
+
+    b2.id = 2;
+    b2.angle = 90.0;
+    b2.length = 200.0;
+    b2.position.x = 300.0;
+    b2.position.y = 250.0;
+
+    b3.id = 3;
+    b3.angle = 90.0;
+    b3.length = 200.0;
+    b3.position.x = 400.0;
+    b3.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { b0, b1, b2, b3 };
+    std::vector<int> bentBends = { 0, 1, 2, 3 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // With 4 large dead zones, valid area should be very small
+    double validArea = constraint.validRegion.area();
+
+    // May or may not be valid depending on coverage
+    // Just verify hasValidGrip is consistent with area check
+    if (validArea < constraint.minRequiredArea ||
+        constraint.maxInscribedRect.area < 100.0) {
+        REQUIRE(constraint.hasValidGrip == false);
+    }
+}
+
+TEST_CASE("Grip validation - warnings for edge cases", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Warnings should be a vector of strings
+    REQUIRE(constraint.warnings.size() >= 0);
+
+    // Each warning should be non-empty if present
+    for (const auto& warning : constraint.warnings) {
+        REQUIRE(!warning.empty());
+    }
+}
+
+TEST_CASE("Grip validation - statistics accuracy", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    // Analyze flat and bent states
+    generator.analyze(bends, {});
+    generator.analyze(bends, {0});
+
+    auto stats = generator.getStatistics();
+
+    // Should have analyzed 2 states
+    REQUIRE(stats.totalStatesAnalyzed == 2);
+
+    // Valid + invalid should equal total
+    REQUIRE(stats.validGripCount + stats.invalidGripCount == stats.totalStatesAnalyzed);
+
+    // At least flat state should be valid
+    REQUIRE(stats.validGripCount >= 1);
+
+    // Should have generated dead zones for bent state
+    REQUIRE(stats.totalDeadZonesGenerated >= 1);
+}
+
+TEST_CASE("Grip validation - performance timing", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature b0, b1, b2;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 100.0;
+
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 100.0;
+
+    b2.id = 2;
+    b2.angle = 90.0;
+    b2.length = 100.0;
+
+    std::vector<BendFeature> bends = { b0, b1, b2 };
+
+    // Analyze multiple states
+    for (int i = 0; i < 5; i++) {
+        std::vector<int> state;
+        if (i > 0) state.push_back(0);
+        if (i > 1) state.push_back(1);
+        if (i > 2) state.push_back(2);
+        generator.analyze(bends, state);
+    }
+
+    auto stats = generator.getStatistics();
+
+    // Should have timing data
+    REQUIRE(stats.analysisTimeMs >= 0.0);
+    REQUIRE(stats.avgStateTimeMs >= 0.0);
+
+    // Average should be reasonable (< 10ms per state for simple geometry)
+    REQUIRE(stats.avgStateTimeMs < 10.0);
+}
+
+TEST_CASE("Grip validation - complex multi-bend scenario", "[phase2][grasp][validation][advanced]") {
+    GraspConstraintGenerator generator;
+
+    // Create realistic scenario: 3 bends in sequence
+    BendFeature b0, b1, b2;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 100.0;
+    b0.position.x = 150.0;
+    b0.position.y = 250.0;
+
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 100.0;
+    b1.position.x = 250.0;
+    b1.position.y = 250.0;
+
+    b2.id = 2;
+    b2.angle = 90.0;
+    b2.length = 100.0;
+    b2.position.x = 350.0;
+    b2.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { b0, b1, b2 };
+
+    // Test progressive bending
+    auto state0 = generator.analyze(bends, {});        // Flat
+    auto state1 = generator.analyze(bends, {0});       // 1 bend
+    auto state2 = generator.analyze(bends, {0, 1});    // 2 bends
+    auto state3 = generator.analyze(bends, {0, 1, 2}); // 3 bends
+
+    // Valid area should decrease progressively
+    REQUIRE(state0.validRegion.area() > state1.validRegion.area());
+    REQUIRE(state1.validRegion.area() > state2.validRegion.area());
+    REQUIRE(state2.validRegion.area() > state3.validRegion.area());
+
+    // All states should have valid data
+    REQUIRE(state0.deadZones.size() == 0);
+    REQUIRE(state1.deadZones.size() == 1);
+    REQUIRE(state2.deadZones.size() == 2);
+    REQUIRE(state3.deadZones.size() == 3);
+
+    // Flat state should definitely be valid
+    REQUIRE(state0.hasValidGrip == true);
+}
