@@ -79,3 +79,19 @@ target_include_directories(test_grasp_constraint_generator PRIVATE
 )
 
 catch_discover_tests(test_grasp_constraint_generator)
+
+# ABAConstraintAnalyzer tests
+add_executable(test_aba_constraint_analyzer
+    test_aba_constraint_analyzer.cpp
+)
+
+target_link_libraries(test_aba_constraint_analyzer PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_aba_constraint_analyzer PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_aba_constraint_analyzer)
