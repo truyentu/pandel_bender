@@ -148,3 +148,79 @@ TEST_CASE("PrecedenceDAG finalize with branching", "[phase2][dag]") {
     REQUIRE(node3->level == 2);
 }
 
+TEST_CASE("PrecedenceDAG isAcyclic - simple acyclic graph", "[phase2][dag]") {
+    PrecedenceDAG dag;
+
+    dag.addNode(0);
+    dag.addNode(1);
+    dag.addNode(2);
+    dag.addEdge(0, 1, ConstraintType::GEOMETRIC, 1.0, "0->1");
+    dag.addEdge(1, 2, ConstraintType::GEOMETRIC, 1.0, "1->2");
+
+    dag.finalize();
+
+    REQUIRE(dag.isAcyclic() == true);
+}
+
+TEST_CASE("PrecedenceDAG isAcyclic - simple cycle", "[phase2][dag]") {
+    PrecedenceDAG dag;
+
+    // Create a simple cycle: 0 -> 1 -> 2 -> 0
+    dag.addNode(0);
+    dag.addNode(1);
+    dag.addNode(2);
+    dag.addEdge(0, 1, ConstraintType::GEOMETRIC, 1.0, "0->1");
+    dag.addEdge(1, 2, ConstraintType::GEOMETRIC, 1.0, "1->2");
+    dag.addEdge(2, 0, ConstraintType::GEOMETRIC, 1.0, "2->0");  // Creates cycle!
+
+    dag.finalize();
+
+    REQUIRE(dag.isAcyclic() == false);
+}
+
+TEST_CASE("PrecedenceDAG isAcyclic - self cycle", "[phase2][dag]") {
+    PrecedenceDAG dag;
+
+    dag.addNode(0);
+    dag.addEdge(0, 0, ConstraintType::GEOMETRIC, 1.0, "0->0");  // Self-loop
+
+    dag.finalize();
+
+    REQUIRE(dag.isAcyclic() == false);
+}
+
+TEST_CASE("PrecedenceDAG isAcyclic - diamond pattern (acyclic)", "[phase2][dag]") {
+    PrecedenceDAG dag;
+
+    // Diamond is acyclic
+    dag.addNode(0);
+    dag.addNode(1);
+    dag.addNode(2);
+    dag.addNode(3);
+    dag.addEdge(0, 1, ConstraintType::GEOMETRIC, 1.0, "0->1");
+    dag.addEdge(0, 2, ConstraintType::GEOMETRIC, 1.0, "0->2");
+    dag.addEdge(1, 3, ConstraintType::GEOMETRIC, 1.0, "1->3");
+    dag.addEdge(2, 3, ConstraintType::GEOMETRIC, 1.0, "2->3");
+
+    dag.finalize();
+
+    REQUIRE(dag.isAcyclic() == true);
+}
+
+TEST_CASE("PrecedenceDAG isAcyclic - complex cycle", "[phase2][dag]") {
+    PrecedenceDAG dag;
+
+    // Create complex graph with hidden cycle
+    dag.addNode(0);
+    dag.addNode(1);
+    dag.addNode(2);
+    dag.addNode(3);
+    dag.addEdge(0, 1, ConstraintType::GEOMETRIC, 1.0, "0->1");
+    dag.addEdge(1, 2, ConstraintType::GEOMETRIC, 1.0, "1->2");
+    dag.addEdge(2, 3, ConstraintType::GEOMETRIC, 1.0, "2->3");
+    dag.addEdge(3, 1, ConstraintType::GEOMETRIC, 1.0, "3->1");  // Creates cycle 1->2->3->1
+
+    dag.finalize();
+
+    REQUIRE(dag.isAcyclic() == false);
+}

@@ -138,8 +138,21 @@ bool PrecedenceDAG::finalize() {
 }
 
 bool PrecedenceDAG::isAcyclic() {
-    // Will implement in Task 8
-    return true;
+    // Use DFS-based cycle detection with 3-color algorithm
+    // State: 0 = unvisited (white), 1 = visiting (gray), 2 = visited (black)
+
+    std::vector<int> state(m_nodes.size(), 0);  // Initialize all as unvisited
+
+    // Try DFS from each unvisited node
+    for (size_t i = 0; i < m_nodes.size(); i++) {
+        if (state[i] == 0) {  // Unvisited
+            if (hasCycleDFS(static_cast<int>(i), state)) {
+                return false;  // Cycle detected
+            }
+        }
+    }
+
+    return true;  // No cycles found
 }
 
 std::vector<int> PrecedenceDAG::topologicalSort() {
@@ -148,8 +161,45 @@ std::vector<int> PrecedenceDAG::topologicalSort() {
 }
 
 bool PrecedenceDAG::hasCycleDFS(int nodeId, std::vector<int>& state) {
-    // Will implement in Task 8
-    return false;
+    // Mark current node as visiting (gray)
+    state[nodeId] = 1;
+
+    const PrecedenceNode& node = m_nodes[nodeId];
+
+    // Visit all successors
+    for (int successorBendId : node.successors) {
+        // Find successor node by bendId
+        int successorNodeId = -1;
+        for (size_t i = 0; i < m_nodes.size(); i++) {
+            if (m_nodes[i].bendId == successorBendId) {
+                successorNodeId = static_cast<int>(i);
+                break;
+            }
+        }
+
+        if (successorNodeId == -1) {
+            continue;  // Successor not found (shouldn't happen)
+        }
+
+        if (state[successorNodeId] == 1) {
+            // Visiting node again - cycle detected!
+            return true;
+        }
+
+        if (state[successorNodeId] == 0) {
+            // Unvisited - recurse
+            if (hasCycleDFS(successorNodeId, state)) {
+                return true;
+            }
+        }
+
+        // If state == 2 (visited), no need to check again
+    }
+
+    // Mark current node as visited (black)
+    state[nodeId] = 2;
+
+    return false;  // No cycle found from this node
 }
 
 } // namespace phase2
