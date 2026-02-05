@@ -78,6 +78,61 @@ void PrecedenceDAG::clear() {
 }
 
 bool PrecedenceDAG::finalize() {
+    if (m_finalized) {
+        return true;  // Already finalized
+    }
+
+    // Reset all node levels
+    for (auto& node : m_nodes) {
+        node.level = 0;
+        node.visited = false;
+    }
+
+    // Calculate levels using BFS approach
+    // Level = longest path from any root node to this node
+
+    // First, find all root nodes (no predecessors)
+    std::vector<int> roots;
+    for (const auto& node : m_nodes) {
+        if (node.predecessors.empty()) {
+            roots.push_back(node.id);
+        }
+    }
+
+    // If no roots found, all nodes are in cycles or graph is empty
+    if (roots.empty() && !m_nodes.empty()) {
+        return false;  // Cannot finalize - likely has cycles
+    }
+
+    // BFS from all roots to calculate levels
+    std::queue<int> queue;
+    for (int rootId : roots) {
+        queue.push(rootId);
+    }
+
+    while (!queue.empty()) {
+        int currentId = queue.front();
+        queue.pop();
+
+        PrecedenceNode& currentNode = m_nodes[currentId];
+
+        // Process all successors
+        for (int successorBendId : currentNode.successors) {
+            // Find successor node by bendId
+            for (auto& node : m_nodes) {
+                if (node.bendId == successorBendId) {
+                    // Update level to max of (current level, predecessor level + 1)
+                    int newLevel = currentNode.level + 1;
+                    if (newLevel > node.level) {
+                        node.level = newLevel;
+                        queue.push(node.id);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     m_finalized = true;
     return true;
 }
