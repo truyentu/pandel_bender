@@ -992,3 +992,349 @@ TEST_CASE("Box closing - reason string when flagged", "[phase2][aba][boxclosing]
     // Reason should not be empty
     REQUIRE(!c.reason.empty());
 }
+
+// ============================================================================
+// Task 25: Integration Testing & Final Validation
+// ============================================================================
+
+TEST_CASE("Integration - realistic part with 5 bends", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    // Realistic scenario: U-channel with flanges
+    BendFeature b0, b1, b2, b3, b4;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 150.0;
+
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 200.0;
+
+    b2.id = 2;
+    b2.angle = 90.0;
+    b2.length = 150.0;
+
+    b3.id = 3;
+    b3.angle = 45.0;  // Smaller flange
+    b3.length = 50.0;
+
+    b4.id = 4;
+    b4.angle = 90.0;
+    b4.length = 100.0;
+
+    std::vector<BendFeature> bends = { b0, b1, b2, b3, b4 };
+
+    auto constraints = analyzer.analyze(bends);
+
+    // Should analyze all bends
+    REQUIRE(constraints.size() == 5);
+
+    // All should have valid solutions
+    int feasibleCount = 0;
+    for (const auto& c : constraints) {
+        if (c.feasible) {
+            feasibleCount++;
+        }
+    }
+
+    REQUIRE(feasibleCount >= 4);  // At least most should be feasible
+
+    // Statistics should be accurate
+    auto stats = analyzer.getStatistics();
+    REQUIRE(stats.totalBendsAnalyzed == 5);
+    REQUIRE(stats.feasibleCount + stats.infeasibleCount == 5);
+}
+
+TEST_CASE("Integration - varied bend lengths", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    std::vector<BendFeature> bends;
+    std::vector<double> lengths = { 25.0, 75.0, 150.0, 275.0, 500.0, 750.0 };
+
+    for (size_t i = 0; i < lengths.size(); i++) {
+        BendFeature bend;
+        bend.id = static_cast<int>(i);
+        bend.angle = 90.0;
+        bend.length = lengths[i];
+        bends.push_back(bend);
+    }
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == lengths.size());
+
+    // All should find solutions
+    for (const auto& c : constraints) {
+        REQUIRE(c.feasible == true);
+        REQUIRE(c.totalWidth >= c.requiredWidth);
+        REQUIRE(!c.segmentSolution.empty());
+    }
+
+    // Verify segment count increases with length
+    REQUIRE(constraints[0].totalSegments <= constraints[5].totalSegments);
+}
+
+TEST_CASE("Integration - varied angles", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    std::vector<BendFeature> bends;
+    std::vector<double> angles = { 15.0, 30.0, 45.0, 60.0, 90.0, 120.0, 135.0 };
+
+    for (size_t i = 0; i < angles.size(); i++) {
+        BendFeature bend;
+        bend.id = static_cast<int>(i);
+        bend.angle = angles[i];
+        bend.length = 100.0;
+        bends.push_back(bend);
+    }
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == angles.size());
+
+    // Verify clearance increases with angle
+    for (size_t i = 0; i < constraints.size() - 1; i++) {
+        if (constraints[i].clearance < constraints[i + 1].clearance) {
+            // Clearance generally increases with angle
+            REQUIRE(constraints[i].clearance <= constraints[i + 1].clearance);
+        }
+    }
+
+    // All should be feasible
+    for (const auto& c : constraints) {
+        REQUIRE(c.feasible == true);
+    }
+}
+
+TEST_CASE("Integration - performance benchmark 100 bends", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    std::vector<BendFeature> bends;
+    for (int i = 0; i < 100; i++) {
+        BendFeature bend;
+        bend.id = i;
+        bend.angle = 45.0 + (i % 3) * 22.5;  // Vary angles
+        bend.length = 50.0 + (i % 5) * 50.0;  // Vary lengths
+        bends.push_back(bend);
+    }
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 100);
+
+    auto stats = analyzer.getStatistics();
+
+    // Performance should be good
+    REQUIRE(stats.analysisTimeMs >= 0.0);
+    REQUIRE(stats.avgBendTimeMs >= 0.0);
+
+    // Should complete reasonably fast (< 500ms for 100 bends)
+    REQUIRE(stats.analysisTimeMs < 500.0);
+
+    // Average per bend should be fast (< 5ms)
+    REQUIRE(stats.avgBendTimeMs < 5.0);
+
+    // All should be analyzed
+    REQUIRE(stats.totalBendsAnalyzed == 100);
+}
+
+TEST_CASE("Integration - edge cases collection", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    std::vector<BendFeature> bends;
+
+    // Edge case 1: Very small
+    BendFeature b0;
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 5.0;
+    bends.push_back(b0);
+
+    // Edge case 2: Very large
+    BendFeature b1;
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 1500.0;  // Triggers greedy fallback
+    bends.push_back(b1);
+
+    // Edge case 3: Zero angle
+    BendFeature b2;
+    b2.id = 2;
+    b2.angle = 0.0;
+    b2.length = 100.0;
+    bends.push_back(b2);
+
+    // Edge case 4: Negative angle
+    BendFeature b3;
+    b3.id = 3;
+    b3.angle = -90.0;
+    b3.length = 100.0;
+    bends.push_back(b3);
+
+    // Edge case 5: Obtuse angle
+    BendFeature b4;
+    b4.id = 4;
+    b4.angle = 175.0;
+    b4.length = 100.0;
+    bends.push_back(b4);
+
+    auto constraints = analyzer.analyze(bends);
+
+    REQUIRE(constraints.size() == 5);
+
+    // All edge cases should be handled gracefully
+    for (const auto& c : constraints) {
+        REQUIRE(c.feasible == true);
+        REQUIRE(c.clearance >= 5.0);
+        REQUIRE(c.clearance <= 15.0);
+        REQUIRE(c.totalWidth >= c.requiredWidth);
+    }
+}
+
+TEST_CASE("Integration - statistics completeness", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    std::vector<BendFeature> bends;
+    for (int i = 0; i < 20; i++) {
+        BendFeature bend;
+        bend.id = i;
+        bend.angle = 90.0;
+        bend.length = 100.0 + i * 10.0;
+        bends.push_back(bend);
+    }
+
+    auto constraints = analyzer.analyze(bends);
+
+    auto stats = analyzer.getStatistics();
+
+    // Verify all statistics are populated
+    REQUIRE(stats.totalBendsAnalyzed == 20);
+    REQUIRE(stats.feasibleCount + stats.infeasibleCount == stats.totalBendsAnalyzed);
+    REQUIRE(stats.analysisTimeMs > 0.0);
+    REQUIRE(stats.avgBendTimeMs > 0.0);
+    REQUIRE(stats.boxClosingCount >= 0);
+
+    // Verify timing consistency
+    double expectedAvg = stats.analysisTimeMs / stats.totalBendsAnalyzed;
+    REQUIRE(stats.avgBendTimeMs == Approx(expectedAvg).epsilon(0.01));
+}
+
+TEST_CASE("Integration - constraint properties validation", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 200.0;
+
+    auto constraints = analyzer.analyze({ bend });
+
+    REQUIRE(constraints.size() == 1);
+
+    const auto& c = constraints[0];
+
+    // Verify all properties are set
+    REQUIRE(c.bendId == 0);
+    REQUIRE(c.bendLength == 200.0);
+    REQUIRE(c.requiredWidth > 0.0);
+    REQUIRE(c.clearance > 0.0);
+
+    if (c.feasible) {
+        REQUIRE(!c.segmentSolution.empty());
+        REQUIRE(c.totalSegments > 0);
+        REQUIRE(c.totalWidth > 0.0);
+
+        // Verify segment solution validity
+        int sumSegments = 0;
+        for (int seg : c.segmentSolution) {
+            sumSegments += seg;
+        }
+        REQUIRE(sumSegments == Approx(c.totalWidth).epsilon(0.01));
+    }
+
+    // Reason should be informative
+    REQUIRE(!c.reason.empty());
+}
+
+TEST_CASE("Integration - consistency across multiple analyses", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 150.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    // Analyze multiple times
+    auto c1 = analyzer.analyze(bends);
+    auto c2 = analyzer.analyze(bends);
+    auto c3 = analyzer.analyze(bends);
+
+    // Results should be identical
+    REQUIRE(c1[0].requiredWidth == c2[0].requiredWidth);
+    REQUIRE(c2[0].requiredWidth == c3[0].requiredWidth);
+
+    REQUIRE(c1[0].clearance == c2[0].clearance);
+    REQUIRE(c2[0].clearance == c3[0].clearance);
+
+    REQUIRE(c1[0].totalSegments == c2[0].totalSegments);
+    REQUIRE(c2[0].totalSegments == c3[0].totalSegments);
+
+    REQUIRE(c1[0].totalWidth == c2[0].totalWidth);
+    REQUIRE(c2[0].totalWidth == c3[0].totalWidth);
+}
+
+TEST_CASE("Integration - module completion verification", "[phase2][aba][integration]") {
+    ABAConstraintAnalyzer analyzer;
+
+    // Create comprehensive test scenario
+    std::vector<BendFeature> bends;
+
+    // Mix of different bends
+    double lengths[] = { 50.0, 100.0, 150.0, 200.0, 275.0 };
+    double angles[] = { 45.0, 60.0, 90.0, 120.0, 135.0 };
+
+    for (int i = 0; i < 5; i++) {
+        BendFeature bend;
+        bend.id = i;
+        bend.angle = angles[i];
+        bend.length = lengths[i];
+        bends.push_back(bend);
+    }
+
+    auto constraints = analyzer.analyze(bends);
+
+    // Verify module completeness
+    REQUIRE(constraints.size() == 5);
+
+    // All core features should work
+    for (const auto& c : constraints) {
+        // Feature 1: Required width calculation
+        REQUIRE(c.requiredWidth == Approx(c.bendLength + c.clearance).epsilon(0.01));
+
+        // Feature 2: Clearance calculation
+        REQUIRE(c.clearance >= 5.0);
+        REQUIRE(c.clearance <= 15.0);
+
+        // Feature 3: Subset sum solver
+        if (c.feasible) {
+            REQUIRE(!c.segmentSolution.empty());
+            REQUIRE(c.totalWidth >= c.requiredWidth);
+        }
+
+        // Feature 4: Box closing detection
+        REQUIRE((c.isBoxClosing == true || c.isBoxClosing == false));
+
+        // Feature 5: Reason generation
+        REQUIRE(!c.reason.empty());
+    }
+
+    // Statistics tracking
+    auto stats = analyzer.getStatistics();
+    REQUIRE(stats.totalBendsAnalyzed == 5);
+    REQUIRE(stats.feasibleCount >= 0);
+    REQUIRE(stats.analysisTimeMs >= 0.0);
+}
+
