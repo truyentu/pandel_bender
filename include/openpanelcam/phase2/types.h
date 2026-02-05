@@ -130,6 +130,55 @@ struct Rectangle2D {
     }
 };
 
+// Dead zone on base plane (forbidden grip region)
+struct DeadZone {
+    int id = -1;
+    DeadZoneType type = DeadZoneType::STANDING_FLANGE;
+    Polygon2D polygon;
+    int causedByBend = -1;
+    double safetyMargin = 0.0;
+
+    // Calculate dead zone area
+    double area() const {
+        return polygon.area();
+    }
+
+    // Check if point is in dead zone
+    bool contains(const Point2D& point) const {
+        return polygon.contains(point);
+    }
+};
+
+// Grasp constraint for a specific bend state
+struct GraspConstraint {
+    int stateId = -1;
+    std::vector<int> bentBends;
+    std::vector<DeadZone> deadZones;
+    Polygon2D validRegion;
+    double validArea = 0.0;
+    Rectangle2D maxInscribedRect;
+    Point2D optimalGripCenter;
+    bool hasValidGrip = false;
+    double minRequiredArea = 100.0;
+    Point2D centerOfMass;
+    std::vector<std::string> warnings;
+};
+
+// ABA tool constraint for a bend
+struct ABAConstraint {
+    int bendId = -1;
+    double bendLength = 0.0;
+    double requiredWidth = 0.0;
+    double clearance = 0.0;
+    std::vector<int> segmentSolution;
+    int totalSegments = 0;
+    double totalWidth = 0.0;
+    bool feasible = false;
+    bool isBoxClosing = false;
+    std::string reason;
+    std::vector<int> suggestedAlternatives;
+};
+
 struct PrecedenceNode {
     int id = -1;
     int bendId = -1;

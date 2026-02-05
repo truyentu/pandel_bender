@@ -116,3 +116,82 @@ TEST_CASE("Rectangle2D center", "[phase2][types]") {
     REQUIRE(std::abs(rect.center.x - 5.0) < 0.01);
     REQUIRE(std::abs(rect.center.y - 10.0) < 0.01);
 }
+
+TEST_CASE("DeadZone construction and methods", "[phase2][types]") {
+    DeadZone dz;
+    dz.id = 1;
+    dz.type = DeadZoneType::STANDING_FLANGE;
+    dz.polygon.vertices = {
+        Point2D(0, 0),
+        Point2D(5, 0),
+        Point2D(5, 5),
+        Point2D(0, 5)
+    };
+    dz.causedByBend = 2;
+    dz.safetyMargin = 2.0;
+
+    REQUIRE(dz.id == 1);
+    REQUIRE(dz.type == DeadZoneType::STANDING_FLANGE);
+    REQUIRE(dz.causedByBend == 2);
+    REQUIRE(std::abs(dz.area() - 25.0) < 0.01);
+    REQUIRE(dz.contains(Point2D(2, 2)) == true);
+    REQUIRE(dz.contains(Point2D(10, 10)) == false);
+}
+
+TEST_CASE("GraspConstraint construction and fields", "[phase2][types]") {
+    GraspConstraint gc;
+    gc.stateId = 5;
+    gc.bentBends = {0, 1, 2};
+
+    DeadZone dz;
+    dz.id = 1;
+    dz.type = DeadZoneType::STANDING_FLANGE;
+    gc.deadZones.push_back(dz);
+
+    gc.validRegion.vertices = {
+        Point2D(0, 0),
+        Point2D(100, 0),
+        Point2D(100, 100),
+        Point2D(0, 100)
+    };
+    gc.validArea = 10000.0;
+    gc.maxInscribedRect = Rectangle2D(Point2D(10, 10), Point2D(90, 90));
+    gc.optimalGripCenter = Point2D(50, 50);
+    gc.hasValidGrip = true;
+    gc.minRequiredArea = 100.0;
+    gc.centerOfMass = Point2D(50, 50);
+    gc.warnings.push_back("Test warning");
+
+    REQUIRE(gc.stateId == 5);
+    REQUIRE(gc.bentBends.size() == 3);
+    REQUIRE(gc.deadZones.size() == 1);
+    REQUIRE(gc.validArea == 10000.0);
+    REQUIRE(gc.hasValidGrip == true);
+    REQUIRE(gc.warnings.size() == 1);
+}
+
+TEST_CASE("ABAConstraint construction and fields", "[phase2][types]") {
+    ABAConstraint aba;
+    aba.bendId = 3;
+    aba.bendLength = 275.0;
+    aba.requiredWidth = 280.0;
+    aba.clearance = 5.0;
+    aba.segmentSolution = {100, 175};
+    aba.totalSegments = 2;
+    aba.totalWidth = 275.0;
+    aba.feasible = true;
+    aba.isBoxClosing = false;
+    aba.reason = "Valid solution found";
+    aba.suggestedAlternatives = {50, 100, 125};
+
+    REQUIRE(aba.bendId == 3);
+    REQUIRE(std::abs(aba.bendLength - 275.0) < 0.01);
+    REQUIRE(std::abs(aba.requiredWidth - 280.0) < 0.01);
+    REQUIRE(aba.segmentSolution.size() == 2);
+    REQUIRE(aba.totalSegments == 2);
+    REQUIRE(aba.feasible == true);
+    REQUIRE(aba.isBoxClosing == false);
+    REQUIRE(aba.reason == "Valid solution found");
+    REQUIRE(aba.suggestedAlternatives.size() == 3);
+}
+
