@@ -15,3 +15,19 @@ target_include_directories(test_types PRIVATE
 )
 
 catch_discover_tests(test_types)
+
+# PrecedenceDAG tests
+add_executable(test_precedence_dag
+    test_precedence_dag.cpp
+)
+
+target_link_libraries(test_precedence_dag PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_precedence_dag PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_precedence_dag)
