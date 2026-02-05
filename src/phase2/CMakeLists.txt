@@ -5,6 +5,7 @@
 add_library(openpanelcam_phase2
     precedence_dag.cpp
     geometric_precedence_analyzer.cpp
+    grasp_constraint_generator.cpp
 )
 
 target_include_directories(openpanelcam_phase2 PUBLIC

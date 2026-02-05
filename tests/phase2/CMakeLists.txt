@@ -63,3 +63,19 @@ target_include_directories(test_geometric_integration PRIVATE
 )
 
 catch_discover_tests(test_geometric_integration)
+
+# GraspConstraintGenerator tests
+add_executable(test_grasp_constraint_generator
+    test_grasp_constraint_generator.cpp
+)
+
+target_link_libraries(test_grasp_constraint_generator PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_grasp_constraint_generator PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_grasp_constraint_generator)
