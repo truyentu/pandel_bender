@@ -159,3 +159,19 @@ target_include_directories(test_constraint_solver_states PRIVATE
 )
 
 catch_discover_tests(test_constraint_solver_states)
+
+# ConstraintSolver end-to-end integration tests
+add_executable(test_constraint_solver_e2e
+    test_constraint_solver_e2e.cpp
+)
+
+target_link_libraries(test_constraint_solver_e2e PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_constraint_solver_e2e PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_constraint_solver_e2e)
