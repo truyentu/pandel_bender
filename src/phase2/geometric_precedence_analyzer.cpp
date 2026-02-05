@@ -78,6 +78,26 @@ std::vector<PrecedenceEdge> GeometricPrecedenceAnalyzer::analyze(
                 m_stats.totalConstraints++;
             }
 
+            // Type 3: Sequential blocking
+            // If bj bending first would block access to bi
+            // then bi must bend before bj
+            BentState blockingState;
+            blockingState.applyBend(bj.id);  // Simulate bj already bent
+
+            if (isBlocked(bi, bj, blockingState)) {
+                PrecedenceEdge edge;
+                edge.id = static_cast<int>(constraints.size());
+                edge.fromBend = bi.id;
+                edge.toBend = bj.id;
+                edge.type = ConstraintType::SEQUENTIAL;
+                edge.confidence = 0.9;  // Slightly less confident than geometric
+                edge.reasoning = "Sequential blocking - access obstructed";
+
+                constraints.push_back(edge);
+                m_stats.sequentialBlockCount++;
+                m_stats.totalConstraints++;
+            }
+
             // Type 2: Check if bending would close a box
             // Note: Box closing is checked per bend, not per pair
             // We'll handle this in a separate loop
@@ -100,9 +120,6 @@ std::vector<PrecedenceEdge> GeometricPrecedenceAnalyzer::analyze(
             m_stats.boxClosingCount++;
         }
     }
-
-    // Type 3: Sequential blocking
-    // Already partially covered in corner overlap check
 
     return constraints;
 }
@@ -391,12 +408,48 @@ bool GeometricPrecedenceAnalyzer::isBlocked(
     const phase1::BendFeature& bj,
     const BentState& state
 ) {
-    // Simplified implementation
-    // Real implementation would:
-    // 1. Simulate bending bj
-    // 2. Check if bi's bend line is still accessible
+    // Sequential blocking detection:
+    // Check if bending bj first would block access to bi's bend line
 
-    // For now, return false (not blocked)
+    // Algorithm:
+    // 1. Simulate bending bj (assume it's in bent state)
+    // 2. Check if bj's bent flange would obstruct tool access to bi
+    // 3. Tool approaches from above (Z direction) to reach bend line
+
+    // Simplified implementation:
+    // - Check proximity of bend lines
+    // - If bends are close and parallel, one might block the other
+
+    // Calculate distance between bend lines
+    double dx = bi.position.x - bj.position.x;
+    double dy = bi.position.y - bj.position.y;
+    double distance = std::sqrt(dx*dx + dy*dy);
+
+    // Flange width after bending (simplified: 50mm)
+    double flangeWidth = 50.0;
+
+    // If bends are very close (within flange width), might block
+    if (distance < flangeWidth) {
+        // Check if they're parallel (same direction)
+        double dotProduct = bi.direction.x * bj.direction.x +
+                           bi.direction.y * bj.direction.y;
+
+        // If parallel (dot product close to 1 or -1), blocking likely
+        if (std::abs(dotProduct) > 0.9) {
+            return true;  // Parallel and close → blocking
+        }
+    }
+
+    // Check if bj's flange would physically block bi's bend line
+    // Simplified: if bj position overlaps with bi's access zone
+    double accessZoneRadius = 60.0;  // Tool needs ~60mm clearance
+
+    if (distance < accessZoneRadius) {
+        // Close enough that flange might interfere
+        // Real implementation would check actual flange geometry
+        return true;
+    }
+
     return false;
 }
 
