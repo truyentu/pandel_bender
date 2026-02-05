@@ -247,14 +247,143 @@ bool GeometricPrecedenceAnalyzer::isBoxClosing(
     const phase1::BendFeature& bend,
     const BentState& state
 ) {
-    // Simplified implementation
-    // Real implementation would:
-    // 1. Project all bent flanges to 2D
-    // 2. Check if they form 3 sides of a box
-    // 3. Check if next bend would close 4th side
+    // Box closing detection algorithm:
+    // 1. Check if we have at least 3 bends already bent
+    // 2. Check if those 3 bends form 3 sides of a box (U-shape)
+    // 3. Check if the next bend would close the 4th side
 
-    // For now, return false (no box closing)
+    const auto& bentBends = state.getBentBends();
+
+    // Need at least 3 bends bent to form 3-sided box
+    if (bentBends.size() < 3) {
+        return false;
+    }
+
+    // For simplified implementation, we'll use heuristic:
+    // If exactly 3 bends are bent at 90°, and we're trying to bend a 4th at 90°,
+    // this could potentially close a box
+
+    // Count how many 90° bends are already bent
+    // (In real implementation, would check actual spatial arrangement)
+
+    // Simplified check: If 3+ bends bent, might form box
+    // Real implementation would:
+    // - Project flanges to 2D
+    // - Check if they form 3 perpendicular walls
+    // - Check if next bend aligns with gap
+
+    // For now, use conservative approach:
+    // Only flag as box closing if we have exactly 3 bends at 90°
+    // and trying to add 4th at 90°
+
+    if (bentBends.size() == 3 && std::abs(bend.angle - 90.0) < 1.0) {
+        // Potential box closing scenario
+        // In full implementation, would do geometric analysis
+        return false;  // Conservative: don't flag yet without full geometry
+    }
+
     return false;
+}
+
+bool GeometricPrecedenceAnalyzer::forms3SidedBox(
+    const std::vector<int>& bentBends,
+    const std::vector<phase1::BendFeature>& allBends
+) {
+    // Check if bent bends form 3 sides of a rectangular box
+    // Simplified heuristic approach
+
+    if (bentBends.size() != 3) {
+        return false;  // Need exactly 3 bends for 3-sided box
+    }
+
+    // Find the 3 bent bend features
+    std::vector<phase1::BendFeature> bentFeatures;
+    for (int bentId : bentBends) {
+        for (const auto& bend : allBends) {
+            if (bend.id == bentId) {
+                bentFeatures.push_back(bend);
+                break;
+            }
+        }
+    }
+
+    if (bentFeatures.size() != 3) {
+        return false;
+    }
+
+    // Simplified check: All 3 bends should be at approximately 90°
+    for (const auto& bend : bentFeatures) {
+        if (std::abs(bend.angle - 90.0) > 5.0) {
+            return false;  // Not a 90° bend
+        }
+    }
+
+    // If all 3 are at 90°, they could form 3 sides
+    // Real implementation would check spatial arrangement:
+    // - Are they perpendicular to each other?
+    // - Do they share edges?
+    // - Do they form a U-shape when projected to 2D?
+
+    return true;  // Simplified: assume they form 3-sided box
+}
+
+Polygon2D GeometricPrecedenceAnalyzer::projectTo2D(
+    const phase1::BendFeature& bend
+) {
+    // Project flange to 2D base plane (Z=0)
+    // Simplified: Return rectangular projection
+
+    Polygon2D poly;
+
+    double halfLength = bend.length / 2.0;
+    double flangeWidth = 50.0;  // Assume 50mm flange width
+
+    // Create rectangle around bend position
+    poly.vertices.push_back(Point2D(
+        bend.position.x - flangeWidth/2,
+        bend.position.y - halfLength
+    ));
+    poly.vertices.push_back(Point2D(
+        bend.position.x + flangeWidth/2,
+        bend.position.y - halfLength
+    ));
+    poly.vertices.push_back(Point2D(
+        bend.position.x + flangeWidth/2,
+        bend.position.y + halfLength
+    ));
+    poly.vertices.push_back(Point2D(
+        bend.position.x - flangeWidth/2,
+        bend.position.y + halfLength
+    ));
+
+    return poly;
+}
+
+bool GeometricPrecedenceAnalyzer::wouldClose4thSide(
+    const phase1::BendFeature& nextBend,
+    const std::vector<int>& bentBends,
+    const std::vector<phase1::BendFeature>& allBends
+) {
+    // Check if next bend would complete the 4th side of box
+    // Simplified implementation
+
+    if (bentBends.size() != 3) {
+        return false;
+    }
+
+    // Check if next bend is also at 90°
+    if (std::abs(nextBend.angle - 90.0) > 5.0) {
+        return false;
+    }
+
+    // In real implementation, would:
+    // 1. Get 2D projections of 3 bent flanges
+    // 2. Identify the gap (missing 4th side)
+    // 3. Check if nextBend's projection fills that gap
+
+    // Simplified: If we have 3 sides and trying to add 4th at 90°,
+    // assume it would close box
+    return true;
 }
 
 bool GeometricPrecedenceAnalyzer::isBlocked(

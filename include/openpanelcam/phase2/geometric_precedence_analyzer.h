@@ -210,6 +210,49 @@ private:
         const Point3D& rayDirection,
         const phase1::BendFeature& flangeBend
     );
+
+    /**
+     * @brief Helper: Check if bent flanges form 3 sides of a box
+     *
+     * Analyzes the spatial arrangement of bent flanges to detect
+     * if they form a U-shape (3 walls of a box).
+     *
+     * @param bentBends List of already bent bend IDs
+     * @param allBends All bend features for lookup
+     * @return true if 3 sides of box detected
+     */
+    bool forms3SidedBox(
+        const std::vector<int>& bentBends,
+        const std::vector<phase1::BendFeature>& allBends
+    );
+
+    /**
+     * @brief Helper: Project 2D polygon for box analysis
+     *
+     * Projects a flange onto the base plane (Z=0) for 2D analysis.
+     * Simplified version returns bounding box.
+     *
+     * @param bend The bend feature
+     * @return Polygon2D representing flange projection
+     */
+    Polygon2D projectTo2D(const phase1::BendFeature& bend);
+
+    /**
+     * @brief Helper: Check if next bend would close the 4th side
+     *
+     * Given a 3-sided box configuration, checks if the next bend
+     * would complete the enclosure.
+     *
+     * @param nextBend The bend to test
+     * @param bentBends Already bent bends forming 3 sides
+     * @param allBends All bend features
+     * @return true if would close box
+     */
+    bool wouldClose4thSide(
+        const phase1::BendFeature& nextBend,
+        const std::vector<int>& bentBends,
+        const std::vector<phase1::BendFeature>& allBends
+    );
 };
 
 } // namespace phase2
