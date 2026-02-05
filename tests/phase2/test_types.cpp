@@ -1,5 +1,6 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include "openpanelcam/phase2/types.h"
 
 using namespace openpanelcam::phase2;
@@ -52,4 +53,66 @@ TEST_CASE("PrecedenceEdge construction and fields", "[phase2][types]") {
     REQUIRE(edge.confidence == 0.95);
     REQUIRE(edge.reasoning == "Corner overlap detected");
     REQUIRE(edge.conflictPoint.x == 10.0);
+}
+
+TEST_CASE("Polygon2D area calculation", "[phase2][types]") {
+    Polygon2D poly;
+    poly.vertices = {
+        Point2D(0, 0),
+        Point2D(10, 0),
+        Point2D(10, 10),
+        Point2D(0, 10)
+    };
+
+    double area = poly.area();
+    REQUIRE(std::abs(area - 100.0) < 0.01);
+}
+
+TEST_CASE("Polygon2D contains point", "[phase2][types]") {
+    Polygon2D poly;
+    poly.vertices = {
+        Point2D(0, 0),
+        Point2D(10, 0),
+        Point2D(10, 10),
+        Point2D(0, 10)
+    };
+
+    REQUIRE(poly.contains(Point2D(5, 5)) == true);
+    REQUIRE(poly.contains(Point2D(15, 15)) == false);
+}
+
+TEST_CASE("Polygon2D centroid calculation", "[phase2][types]") {
+    Polygon2D poly;
+    poly.vertices = {
+        Point2D(0, 0),
+        Point2D(10, 0),
+        Point2D(10, 10),
+        Point2D(0, 10)
+    };
+
+    Point2D center = poly.centroid();
+    REQUIRE(std::abs(center.x - 5.0) < 0.01);
+    REQUIRE(std::abs(center.y - 5.0) < 0.01);
+}
+
+TEST_CASE("Rectangle2D construction and area", "[phase2][types]") {
+    Rectangle2D rect(Point2D(0, 0), Point2D(10, 20));
+
+    REQUIRE(std::abs(rect.width - 10.0) < 0.01);
+    REQUIRE(std::abs(rect.height - 20.0) < 0.01);
+    REQUIRE(std::abs(rect.area - 200.0) < 0.01);
+}
+
+TEST_CASE("Rectangle2D contains point", "[phase2][types]") {
+    Rectangle2D rect(Point2D(0, 0), Point2D(10, 20));
+
+    REQUIRE(rect.contains(Point2D(5, 10)) == true);
+    REQUIRE(rect.contains(Point2D(15, 10)) == false);
+}
+
+TEST_CASE("Rectangle2D center", "[phase2][types]") {
+    Rectangle2D rect(Point2D(0, 0), Point2D(10, 20));
+
+    REQUIRE(std::abs(rect.center.x - 5.0) < 0.01);
+    REQUIRE(std::abs(rect.center.y - 10.0) < 0.01);
 }
