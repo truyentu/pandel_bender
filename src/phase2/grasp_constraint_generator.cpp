@@ -231,7 +231,7 @@ Polygon2D GraspConstraintGenerator::calculateValidRegion(
     const Point2D& sheetSize,
     const std::vector<DeadZone>& deadZones
 ) {
-    // Simplified: Start with full sheet rectangle
+    // Start with full sheet rectangle
     Polygon2D validRegion;
 
     // Full sheet (0,0) to (sheetSize.x, sheetSize.y)
@@ -240,15 +240,67 @@ Polygon2D GraspConstraintGenerator::calculateValidRegion(
     validRegion.vertices.push_back(Point2D(sheetSize.x, sheetSize.y));
     validRegion.vertices.push_back(Point2D(0, sheetSize.y));
 
-    // Real implementation would subtract dead zone polygons
-    // For now, just return full sheet if no dead zones
+    // If no dead zones, return full sheet
     if (deadZones.empty()) {
         return validRegion;
     }
 
-    // Simplified subtraction: Shrink region if dead zones exist
-    // Real implementation would use polygon Boolean operations
-    double shrinkFactor = 0.8;  // Conservative shrink
+    // Simplified approach: Calculate total dead zone footprint
+    // and shrink valid region accordingly
+
+    // Find union bounding box of all dead zones
+    bool firstZone = true;
+    double dzMinX = 0, dzMaxX = 0, dzMinY = 0, dzMaxY = 0;
+
+    for (const auto& dz : deadZones) {
+        if (dz.polygon.vertices.empty()) continue;
+
+        // Get bounding box of this dead zone
+        double minX = dz.polygon.vertices[0].x;
+        double maxX = dz.polygon.vertices[0].x;
+        double minY = dz.polygon.vertices[0].y;
+        double maxY = dz.polygon.vertices[0].y;
+
+        for (const auto& v : dz.polygon.vertices) {
+            if (v.x < minX) minX = v.x;
+            if (v.x > maxX) maxX = v.x;
+            if (v.y < minY) minY = v.y;
+            if (v.y > maxY) maxY = v.y;
+        }
+
+        if (firstZone) {
+            dzMinX = minX;
+            dzMaxX = maxX;
+            dzMinY = minY;
+            dzMaxY = maxY;
+            firstZone = false;
+        } else {
+            // Expand union bounding box
+            if (minX < dzMinX) dzMinX = minX;
+            if (maxX > dzMaxX) dzMaxX = maxX;
+            if (minY < dzMinY) dzMinY = minY;
+            if (maxY > dzMaxY) dzMaxY = maxY;
+        }
+    }
+
+    // Calculate shrink factor based on dead zone coverage
+    double dzWidth = dzMaxX - dzMinX;
+    double dzHeight = dzMaxY - dzMinY;
+    double dzArea = dzWidth * dzHeight * deadZones.size() * 0.5;  // Approximate
+
+    double sheetArea = sheetSize.x * sheetSize.y;
+    double coverage = dzArea / sheetArea;
+
+    // Limit coverage to avoid invalid regions
+    if (coverage > 0.8) coverage = 0.8;
+
+    // Shrink factor increases with more dead zones
+    double shrinkFactor = 1.0 - coverage;
+
+    // Ensure minimum valid region
+    if (shrinkFactor < 0.4) shrinkFactor = 0.4;
+
+    // Create shrunk valid region centered on sheet
     double centerX = sheetSize.x / 2.0;
     double centerY = sheetSize.y / 2.0;
     double newWidth = sheetSize.x * shrinkFactor;
@@ -274,7 +326,7 @@ Polygon2D GraspConstraintGenerator::calculateValidRegion(
 Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
     const Polygon2D& validRegion
 ) {
-    // Simplified MIR: Use bounding box of valid region
+    // Simplified MIR: Use bounding box of valid region with small inset
     // Real implementation would use rotating calipers or sweep line
 
     Rectangle2D mir;
@@ -299,6 +351,24 @@ Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
         if (v.x > maxX) maxX = v.x;
         if (v.y < minY) minY = v.y;
         if (v.y > maxY) maxY = v.y;
+    }
+
+    // Inset by small margin to ensure MIR is strictly inside valid region
+    double inset = 0.1;  // 0.1mm inset
+    minX += inset;
+    maxX -= inset;
+    minY += inset;
+    maxY -= inset;
+
+    // Ensure positive dimensions
+    if (maxX <= minX || maxY <= minY) {
+        // Degenerate case - no valid MIR
+        mir.bottomLeft = Point2D(0, 0);
+        mir.topRight = Point2D(0, 0);
+        mir.width = 0;
+        mir.height = 0;
+        mir.area = 0;
+        return mir;
     }
 
     // MIR is the bounding box (simplified)

@@ -317,3 +317,257 @@ TEST_CASE("Dead zone - partial bend state", "[phase2][grasp][deadzone]") {
     REQUIRE(hasZone2 == true);
     REQUIRE(hasZone1 == false);  // Bend 1 not bent
 }
+
+// ============================================================================
+// Task 18: 2D Projection & Valid Region Calculation
+// ============================================================================
+
+TEST_CASE("Valid region - flat state has full sheet available", "[phase2][grasp][region]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends;  // Flat state
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Flat state should have large valid region (full sheet)
+    double validArea = constraint.validRegion.area();
+    REQUIRE(validArea > 200000.0);  // 500x500 = 250000mm²
+
+    // Should have no dead zones
+    REQUIRE(constraint.deadZones.empty());
+}
+
+TEST_CASE("Valid region - single bent bend reduces available area", "[phase2][grasp][region]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+    bend.position.x = 250.0;  // Center of sheet
+    bend.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    // Compare flat vs bent
+    std::vector<int> flatState;
+    std::vector<int> bentState = { 0 };
+
+    auto flatConstraint = generator.analyze(bends, flatState);
+    auto bentConstraint = generator.analyze(bends, bentState);
+
+    double flatArea = flatConstraint.validRegion.area();
+    double bentArea = bentConstraint.validRegion.area();
+
+    // Bent state should have smaller valid region
+    REQUIRE(bentArea < flatArea);
+
+    // Bent state should have at least 1 dead zone
+    REQUIRE(bentConstraint.deadZones.size() >= 1);
+}
+
+TEST_CASE("Valid region - multiple dead zones further reduce area", "[phase2][grasp][region]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature b0, b1;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 100.0;
+    b0.position.x = 100.0;
+    b0.position.y = 250.0;
+
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 100.0;
+    b1.position.x = 400.0;
+    b1.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { b0, b1 };
+
+    // Compare: no bends, 1 bend, 2 bends
+    auto state0 = generator.analyze(bends, {});
+    auto state1 = generator.analyze(bends, {0});
+    auto state2 = generator.analyze(bends, {0, 1});
+
+    double area0 = state0.validRegion.area();
+    double area1 = state1.validRegion.area();
+    double area2 = state2.validRegion.area();
+
+    // More dead zones → less valid area
+    REQUIRE(area0 > area1);
+    REQUIRE(area1 > area2);
+}
+
+TEST_CASE("Valid region - maintains rectangular shape (simplified)", "[phase2][grasp][region]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Valid region should be rectangular (4 vertices for simplified implementation)
+    REQUIRE(constraint.validRegion.vertices.size() == 4);
+
+    // Verify it's axis-aligned rectangle
+    const auto& vr = constraint.validRegion;
+
+    // All x-coordinates should be one of two values (left or right edge)
+    // All y-coordinates should be one of two values (top or bottom edge)
+    double minX = vr.vertices[0].x;
+    double maxX = vr.vertices[0].x;
+    double minY = vr.vertices[0].y;
+    double maxY = vr.vertices[0].y;
+
+    for (const auto& v : vr.vertices) {
+        if (v.x < minX) minX = v.x;
+        if (v.x > maxX) maxX = v.x;
+        if (v.y < minY) minY = v.y;
+        if (v.y > maxY) maxY = v.y;
+    }
+
+    // Width and height should be positive
+    REQUIRE(maxX > minX);
+    REQUIRE(maxY > minY);
+}
+
+TEST_CASE("Valid region - centroid calculation", "[phase2][grasp][region]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends;
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Flat state valid region should be centered around sheet center
+    Point2D centroid = constraint.validRegion.centroid();
+
+    // For 500x500 sheet, centroid should be around (250, 250)
+    REQUIRE(centroid.x > 200.0);
+    REQUIRE(centroid.x < 300.0);
+    REQUIRE(centroid.y > 200.0);
+    REQUIRE(centroid.y < 300.0);
+}
+
+TEST_CASE("MIR - fits within valid region", "[phase2][grasp][mir]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // MIR should fit within valid region
+    Rectangle2D mir = constraint.maxInscribedRect;
+
+    // MIR corners should be contained in valid region
+    Point2D bl = mir.bottomLeft;
+    Point2D tr = mir.topRight;
+    Point2D br(tr.x, bl.y);
+    Point2D tl(bl.x, tr.y);
+
+    REQUIRE(constraint.validRegion.contains(bl));
+    REQUIRE(constraint.validRegion.contains(tr));
+    REQUIRE(constraint.validRegion.contains(br));
+    REQUIRE(constraint.validRegion.contains(tl));
+}
+
+TEST_CASE("MIR - area is positive and reasonable", "[phase2][grasp][mir]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // MIR should have positive area
+    REQUIRE(constraint.maxInscribedRect.area > 0.0);
+
+    // MIR area should be <= valid region area
+    double mirArea = constraint.maxInscribedRect.area;
+    double validArea = constraint.validRegion.area();
+
+    REQUIRE(mirArea <= validArea);
+}
+
+TEST_CASE("Grip validation - minimum area threshold", "[phase2][grasp][validation]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends;
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Flat state should have valid grip
+    REQUIRE(constraint.hasValidGrip == true);
+
+    // Valid region area should be above minimum threshold
+    double validArea = constraint.validRegion.area();
+    REQUIRE(validArea >= constraint.minRequiredArea);
+
+    // MIR area should also be sufficient
+    REQUIRE(constraint.maxInscribedRect.area >= 100.0);
+}
+
+TEST_CASE("Grip validation - COM within grip region", "[phase2][grasp][validation]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+    bend.position.x = 250.0;
+    bend.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // COM should be calculated
+    REQUIRE(constraint.centerOfMass.x > 0.0);
+    REQUIRE(constraint.centerOfMass.y > 0.0);
+
+    // For valid grip, COM should be reasonably close to MIR center
+    Point2D mirCenter = constraint.maxInscribedRect.center;
+    Point2D com = constraint.centerOfMass;
+
+    double dx = com.x - mirCenter.x;
+    double dy = com.y - mirCenter.y;
+    double distance = std::sqrt(dx*dx + dy*dy);
+
+    // Distance should be reasonable (< 150mm for this case)
+    REQUIRE(distance < 150.0);
+}
