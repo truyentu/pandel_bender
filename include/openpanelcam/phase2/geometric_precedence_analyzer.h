@@ -14,6 +14,26 @@ namespace phase1 {
         int id = -1;
         double angle = 0.0;
         double length = 0.0;
+
+        // Simplified geometry representation for testing
+        // In real implementation, these would be OCCT TopoDS_Face, gp_Pnt, etc.
+        struct {
+            double x = 0.0;
+            double y = 0.0;
+            double z = 0.0;
+        } position;  // Bend line position
+
+        struct {
+            double x = 0.0;
+            double y = 1.0;  // Default: bend along Y-axis
+            double z = 0.0;
+        } direction;  // Bend line direction
+
+        struct {
+            double x = 0.0;
+            double y = 0.0;
+            double z = 1.0;
+        } normal;  // Bend normal (rotation axis)
     };
 }
 
@@ -147,6 +167,49 @@ public:
 
 private:
     Statistics m_stats;
+
+    /**
+     * @brief Helper: Get 4 corner points of a flange
+     *
+     * Computes the 4 corners of the flange face based on bend line
+     * position, direction, and length.
+     *
+     * @param bend The bend feature
+     * @return Vector of 4 corner points (simplified as Point3D)
+     */
+    std::vector<Point3D> getFlangeCorners(const phase1::BendFeature& bend);
+
+    /**
+     * @brief Helper: Predict motion path during bending
+     *
+     * Computes the direction vector that a point would move
+     * during the bending operation.
+     *
+     * @param bend The bend being performed
+     * @param point Point on the flange
+     * @return Motion direction vector (as Point3D)
+     */
+    Point3D predictMotionPath(
+        const phase1::BendFeature& bend,
+        const Point3D& point
+    );
+
+    /**
+     * @brief Helper: Check if ray intersects with flange region
+     *
+     * Simplified 2D ray-rectangle intersection test.
+     * Real implementation would use OCCT ray-face intersection.
+     *
+     * @param rayOrigin Starting point of ray
+     * @param rayDirection Direction of ray
+     * @param flangeBend The bend whose flange we're testing against
+     * @return true if ray intersects the flange
+     */
+    bool rayIntersectsFlange(
+        const Point3D& rayOrigin,
+        const Point3D& rayDirection,
+        const phase1::BendFeature& flangeBend
+    );
 };
 
 } // namespace phase2
