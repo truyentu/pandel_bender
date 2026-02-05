@@ -307,10 +307,39 @@ bool ABAConstraintAnalyzer::isBoxClosing(
     const phase1::BendFeature& bend,
     const std::vector<phase1::BendFeature>& allBends
 ) {
-    // Simplified box closing detection
-    // Real implementation would check spatial arrangement
+    // Box Closing Detection Algorithm
+    // ================================
+    //
+    // Goal: Detect if bending this bend would trap ABA tool inside a closed box
+    //
+    // Box closing occurs when:
+    // 1. Three bends form U-shape (3-sided box)
+    // 2. Fourth bend would close the 4th side
+    // 3. Tool cannot escape after bending
+    //
+    // Detection strategy:
+    // - Count bends at ~90° (rectangular box requirement)
+    // - Check spatial arrangement (requires full geometry)
+    // - Conservative approach: Avoid false positives
+    //
+    // Current implementation: Conservative heuristic
+    // - Real implementation needs 3D geometry analysis
+    // - Would check:
+    //   * Flange connectivity (shared edges)
+    //   * Spatial closure (forms enclosure)
+    //   * Tool escape paths
+    //
+    // Safety philosophy:
+    // - False negatives acceptable (miss some box scenarios)
+    // - False positives problematic (reject valid bends)
+    // - Conservative: Only flag when certain
+    //
+    // Future enhancement:
+    // - Use OCCT TopoDS_Shape for actual geometry
+    // - Project to 2D, check polygon closure
+    // - Verify tool can exit after bend
 
-    // Heuristic: If we have 4+ bends at 90°, potential box closing
+    // Count bends at approximately 90° (±5°)
     int count90 = 0;
     for (const auto& b : allBends) {
         if (std::abs(b.angle - 90.0) < 5.0) {
@@ -318,12 +347,29 @@ bool ABAConstraintAnalyzer::isBoxClosing(
         }
     }
 
-    // If this bend is one of 4 bends at 90°, might form box
-    if (count90 >= 4 && std::abs(bend.angle - 90.0) < 5.0) {
-        // Conservative: flag as potential box closing
-        // Real implementation would check geometric arrangement
-        return false;  // Conservative: don't flag without spatial analysis
+    // Conservative heuristic: Need exactly 4 bends at 90° for box
+    // This avoids false positives
+    if (count90 < 4) {
+        return false;  // Not enough bends for rectangular box
     }
+
+    // If this bend is one of 4 at 90°, might form box
+    // But without spatial analysis, we can't be certain
+
+    // Additional check: Is this bend at 90°?
+    if (std::abs(bend.angle - 90.0) > 5.0) {
+        return false;  // This bend not contributing to rectangular box
+    }
+
+    // Conservative decision: Don't flag without spatial analysis
+    // Real implementation would:
+    // 1. Check if 3 other bends form U-shape
+    // 2. Check if this bend aligns with gap
+    // 3. Verify tool would be trapped
+
+    // For now, return false (safe default)
+    // This avoids rejecting valid bends
+    // Operator can manually check if needed
 
     return false;
 }
