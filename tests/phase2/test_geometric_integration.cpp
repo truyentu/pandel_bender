@@ -293,3 +293,136 @@ TEST_CASE("Integration - Statistics consistency", "[phase2][integration]") {
     REQUIRE(stats.sequentialBlockCount >= 0);
     REQUIRE(stats.totalConstraints >= 0);
 }
+
+// ============================================================================
+// Task 15: Performance Metrics & Optimization Tests
+// ============================================================================
+
+TEST_CASE("Performance - timing metrics collected", "[phase2][performance]") {
+    GeometricPrecedenceAnalyzer analyzer;
+
+    // Create moderate-size scenario
+    std::vector<BendFeature> bends;
+    for (int i = 0; i < 5; i++) {
+        BendFeature bend;
+        bend.id = i;
+        bend.angle = 90.0;
+        bend.length = 100.0;
+        bend.position.x = i * 100.0;  // Spread out
+        bend.position.y = 0.0;
+        bends.push_back(bend);
+    }
+
+    auto constraints = analyzer.analyze(bends);
+    auto stats = analyzer.getStatistics();
+
+    // Should have timing metrics
+    REQUIRE(stats.analysisTimeMs >= 0.0);
+    REQUIRE(stats.avgPairTimeMs >= 0.0);
+
+    // For 5 bends, should check 20 pairs (5*4)
+    REQUIRE(stats.totalPairsChecked == 20);
+
+    // Average time should be reasonable (< 1ms per pair for simple geometry)
+    // This is a performance sanity check
+    REQUIRE(stats.avgPairTimeMs < 10.0);  // 10ms is very generous
+}
+
+TEST_CASE("Performance - max constraints per pair tracked", "[phase2][performance]") {
+    GeometricPrecedenceAnalyzer analyzer;
+
+    // Create scenario with multiple constraints
+    BendFeature b0, b1, b2;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 100.0;
+    b0.position.x = 0.0;
+    b0.position.y = 0.0;
+    b0.direction.x = 0.0;
+    b0.direction.y = 1.0;
+
+    // b1 close to b0 (multiple constraints possible)
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 100.0;
+    b1.position.x = 30.0;
+    b1.position.y = 0.0;
+    b1.direction.x = 0.0;
+    b1.direction.y = 1.0;
+
+    // b2 far away (no constraints)
+    b2.id = 2;
+    b2.angle = 90.0;
+    b2.length = 100.0;
+    b2.position.x = 500.0;
+    b2.position.y = 0.0;
+
+    std::vector<BendFeature> bends = { b0, b1, b2 };
+
+    auto constraints = analyzer.analyze(bends);
+    auto stats = analyzer.getStatistics();
+
+    // Should track max constraints per pair
+    REQUIRE(stats.maxConstraintsPerPair >= 0);
+
+    // For close parallel bends, might get multiple constraints
+    // (corner overlap + sequential blocking)
+    // Max should be reasonable (≤ 3 for current implementation)
+    REQUIRE(stats.maxConstraintsPerPair <= 3);
+}
+
+TEST_CASE("Performance - scaling with bend count", "[phase2][performance]") {
+    GeometricPrecedenceAnalyzer analyzer;
+
+    // Test with increasing bend counts
+    std::vector<int> bendCounts = { 2, 4, 6, 8 };
+    std::vector<double> times;
+
+    for (int n : bendCounts) {
+        std::vector<BendFeature> bends;
+        for (int i = 0; i < n; i++) {
+            BendFeature bend;
+            bend.id = i;
+            bend.angle = 90.0;
+            bend.length = 100.0;
+            bend.position.x = i * 150.0;  // Spread out to avoid constraints
+            bend.position.y = 0.0;
+            bends.push_back(bend);
+        }
+
+        auto constraints = analyzer.analyze(bends);
+        auto stats = analyzer.getStatistics();
+
+        times.push_back(stats.analysisTimeMs);
+
+        // Verify O(n²) scaling (pairs = n*(n-1))
+        int expectedPairs = n * (n - 1);
+        REQUIRE(stats.totalPairsChecked == expectedPairs);
+    }
+
+    // Times should increase roughly quadratically
+    // (This is a rough check - just ensure it's not exponential)
+    // time[3] / time[0] should be roughly (8/2)² = 16
+    // But we'll be lenient due to variance
+    if (times[0] > 0.0) {
+        double ratio = times[3] / times[0];
+        REQUIRE(ratio < 100.0);  // Should not be exponential
+    }
+}
+
+TEST_CASE("Performance - empty input (edge case)", "[phase2][performance]") {
+    GeometricPrecedenceAnalyzer analyzer;
+
+    std::vector<BendFeature> bends;  // Empty
+
+    auto constraints = analyzer.analyze(bends);
+    auto stats = analyzer.getStatistics();
+
+    // Should handle gracefully
+    REQUIRE(stats.analysisTimeMs >= 0.0);
+    REQUIRE(stats.totalPairsChecked == 0);
+    REQUIRE(stats.totalConstraints == 0);
+    REQUIRE(constraints.empty());
+}
+

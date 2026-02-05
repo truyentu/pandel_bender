@@ -161,6 +161,11 @@ public:
         int boxClosingCount = 0;
         int sequentialBlockCount = 0;
         int totalConstraints = 0;
+
+        // Performance metrics (Task 15)
+        double analysisTimeMs = 0.0;      // Total analysis time
+        double avgPairTimeMs = 0.0;       // Average time per pair
+        int maxConstraintsPerPair = 0;    // Max constraints from single pair
     };
 
     const Statistics& getStatistics() const { return m_stats; }

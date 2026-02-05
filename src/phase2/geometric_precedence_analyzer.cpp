@@ -1,6 +1,7 @@
 #include "openpanelcam/phase2/geometric_precedence_analyzer.h"
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 
 namespace openpanelcam {
 namespace phase2 {
@@ -45,6 +46,9 @@ std::vector<PrecedenceEdge> GeometricPrecedenceAnalyzer::analyze(
         return constraints;
     }
 
+    // Start timing (Task 15: Performance metrics)
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     // Reset statistics
     m_stats = Statistics();
 
@@ -57,6 +61,9 @@ std::vector<PrecedenceEdge> GeometricPrecedenceAnalyzer::analyze(
 
             const auto& bi = bends[i];
             const auto& bj = bends[j];
+
+            // Track constraints per pair
+            int constraintsBeforePair = static_cast<int>(constraints.size());
 
             // Create bent state for testing
             BentState state;
@@ -98,6 +105,12 @@ std::vector<PrecedenceEdge> GeometricPrecedenceAnalyzer::analyze(
                 m_stats.totalConstraints++;
             }
 
+            // Track max constraints per pair (Task 15)
+            int constraintsFromPair = static_cast<int>(constraints.size()) - constraintsBeforePair;
+            if (constraintsFromPair > m_stats.maxConstraintsPerPair) {
+                m_stats.maxConstraintsPerPair = constraintsFromPair;
+            }
+
             // Type 2: Check if bending would close a box
             // Note: Box closing is checked per bend, not per pair
             // We'll handle this in a separate loop
@@ -119,6 +132,15 @@ std::vector<PrecedenceEdge> GeometricPrecedenceAnalyzer::analyze(
             // (In real implementation, this would create multiple constraints)
             m_stats.boxClosingCount++;
         }
+    }
+
+    // End timing and calculate metrics (Task 15)
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    m_stats.analysisTimeMs = duration.count() / 1000.0;  // Convert to milliseconds
+
+    if (m_stats.totalPairsChecked > 0) {
+        m_stats.avgPairTimeMs = m_stats.analysisTimeMs / m_stats.totalPairsChecked;
     }
 
     return constraints;
