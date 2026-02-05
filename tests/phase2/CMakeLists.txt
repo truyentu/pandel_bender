@@ -143,3 +143,19 @@ target_include_directories(test_constraint_solver_cycles PRIVATE
 )
 
 catch_discover_tests(test_constraint_solver_cycles)
+
+# ConstraintSolver state enumeration tests
+add_executable(test_constraint_solver_states
+    test_constraint_solver_states.cpp
+)
+
+target_link_libraries(test_constraint_solver_states PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_constraint_solver_states PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_constraint_solver_states)
