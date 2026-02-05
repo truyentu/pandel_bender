@@ -111,3 +111,19 @@ target_include_directories(test_constraint_solver PRIVATE
 )
 
 catch_discover_tests(test_constraint_solver)
+
+# ConstraintSolver validation tests
+add_executable(test_constraint_solver_validation
+    test_constraint_solver_validation.cpp
+)
+
+target_link_libraries(test_constraint_solver_validation PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_constraint_solver_validation PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_constraint_solver_validation)

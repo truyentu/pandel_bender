@@ -80,6 +80,13 @@ Phase2Output ConstraintSolver::solve(const std::vector<phase1::BendFeature>& ben
             output.success = false;
             output.errors.push_back("Failed to finalize precedence graph - likely has cycles");
             output.analysisSummary = generateSummary(output);
+
+            // Track timing even for failures
+            auto endTime = std::chrono::high_resolution_clock::now();
+            m_stats.totalSolveTimeMs = std::chrono::duration_cast<std::chrono::microseconds>(
+                endTime - startTime
+            ).count() / 1000.0;
+
             return output;
         }
 
