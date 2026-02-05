@@ -95,3 +95,19 @@ target_include_directories(test_aba_constraint_analyzer PRIVATE
 )
 
 catch_discover_tests(test_aba_constraint_analyzer)
+
+# ConstraintSolver tests
+add_executable(test_constraint_solver
+    test_constraint_solver.cpp
+)
+
+target_link_libraries(test_constraint_solver PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_constraint_solver PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_constraint_solver)
