@@ -4,6 +4,7 @@
 
 add_library(openpanelcam_phase2
     precedence_dag.cpp
+    geometric_precedence_analyzer.cpp
 )
 
 target_include_directories(openpanelcam_phase2 PUBLIC
@@ -13,6 +14,11 @@ target_include_directories(openpanelcam_phase2 PUBLIC
 target_link_libraries(openpanelcam_phase2 PUBLIC
     Boost::graph
 )
+
+# TODO: Re-enable when Phase 1 is fixed
+# target_link_libraries(openpanelcam_phase2 PUBLIC
+#     openpanelcam_phase1
+# )
 
 set_target_properties(openpanelcam_phase2 PROPERTIES
     CXX_STANDARD 17

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "openpanelcam",
+  "version": "0.1.0",
+  "description": "OpenPanelCAM - High-performance CAM kernel for Salvagnini P4 Panel Bender",
+  "homepage": "https://github.com/yourusername/openpanelcam",
+  "license": "MIT",
+  "dependencies": [
+    "opencascade",
+    "eigen3",
+    "cgal",
+    "fcl",
+    "nlohmann-json",
+    "spdlog",
+    "catch2",
+    "fmt",
+    "boost-graph",
+    "pugixml"
+  ],
+  "builtin-baseline": "f5cbc726b123896eef77f5acc1b9047a28a0731e"
+}
+
