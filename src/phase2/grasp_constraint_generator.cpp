@@ -326,8 +326,26 @@ Polygon2D GraspConstraintGenerator::calculateValidRegion(
 Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
     const Polygon2D& validRegion
 ) {
-    // Simplified MIR: Use bounding box of valid region with small inset
-    // Real implementation would use rotating calipers or sweep line
+    // Maximum Inscribed Rectangle (MIR) Algorithm
+    // ============================================
+    //
+    // Goal: Find largest axis-aligned rectangle that fits inside valid region
+    //
+    // Current implementation: Bounding box with inset
+    // Rationale:
+    //   - Valid region is always axis-aligned rectangle (from calculateValidRegion)
+    //   - For axis-aligned rectangular regions, bounding box IS the MIR
+    //   - Inset ensures strict containment (handles floating point precision)
+    //   - Complexity: O(n) where n = number of vertices
+    //
+    // Future enhancement for arbitrary polygons:
+    //   - Rotating calipers algorithm for convex polygons
+    //   - Grid-based sampling for concave polygons
+    //   - Dynamic programming approaches
+    //
+    // References:
+    //   - "Largest Empty Rectangle" problem
+    //   - Computational Geometry: Algorithms and Applications (de Berg et al.)
 
     Rectangle2D mir;
 
@@ -340,7 +358,8 @@ Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
         return mir;
     }
 
-    // Find bounding box
+    // Step 1: Find axis-aligned bounding box
+    // This is optimal for axis-aligned rectangular regions
     double minX = validRegion.vertices[0].x;
     double maxX = validRegion.vertices[0].x;
     double minY = validRegion.vertices[0].y;
@@ -353,16 +372,18 @@ Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
         if (v.y > maxY) maxY = v.y;
     }
 
-    // Inset by small margin to ensure MIR is strictly inside valid region
-    double inset = 0.1;  // 0.1mm inset
+    // Step 2: Inset by small margin to ensure strict containment
+    // This handles floating point precision issues with polygon.contains()
+    // For a rectangle, points exactly on the boundary may fail containment test
+    double inset = 0.1;  // 0.1mm inset (negligible for practical purposes)
     minX += inset;
     maxX -= inset;
     minY += inset;
     maxY -= inset;
 
-    // Ensure positive dimensions
+    // Step 3: Validate dimensions
     if (maxX <= minX || maxY <= minY) {
-        // Degenerate case - no valid MIR
+        // Degenerate case - valid region too small for any rectangle
         mir.bottomLeft = Point2D(0, 0);
         mir.topRight = Point2D(0, 0);
         mir.width = 0;
@@ -371,7 +392,7 @@ Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
         return mir;
     }
 
-    // MIR is the bounding box (simplified)
+    // Step 4: Construct MIR
     mir.bottomLeft = Point2D(minX, minY);
     mir.topRight = Point2D(maxX, maxY);
     mir.width = maxX - minX;

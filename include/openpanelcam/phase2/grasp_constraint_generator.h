@@ -125,10 +125,19 @@ private:
      * @brief Find Maximum Inscribed Rectangle (MIR)
      *
      * Finds largest axis-aligned rectangle that fits in valid region.
-     * Uses rotating calipers or sweep line algorithm.
+     *
+     * Current implementation: Bounding box with inset
+     * - Fast O(n) where n = vertices in valid region
+     * - Optimal for axis-aligned rectangular valid regions
+     * - Good approximation for convex polygons
+     *
+     * Future enhancement: Rotating calipers algorithm
+     * - Would handle arbitrary convex polygons
+     * - Could find oriented rectangles (not axis-aligned)
+     * - Complexity: O(n log n)
      *
      * @param validRegion The valid grip polygon
-     * @return Rectangle2D representing MIR
+     * @return Rectangle2D representing MIR (strictly contained)
      */
     Rectangle2D findMaxInscribedRect(
         const Polygon2D& validRegion

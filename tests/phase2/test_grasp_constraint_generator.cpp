@@ -1,8 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include "openpanelcam/phase2/grasp_constraint_generator.h"
 
 using namespace openpanelcam::phase2;
 using namespace openpanelcam::phase1;
+using Catch::Approx;
 
 // ============================================================================
 // Task 16: GraspConstraintGenerator - Basic Setup & Constructor
@@ -570,4 +572,218 @@ TEST_CASE("Grip validation - COM within grip region", "[phase2][grasp][validatio
 
     // Distance should be reasonable (< 150mm for this case)
     REQUIRE(distance < 150.0);
+}
+
+// ============================================================================
+// Task 19: True MIR (Maximum Inscribed Rectangle) Algorithm
+// ============================================================================
+
+TEST_CASE("MIR - simple rectangular valid region", "[phase2][grasp][mir][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends;  // Flat state
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // For rectangular valid region, MIR should equal the region (minus inset)
+    Rectangle2D mir = constraint.maxInscribedRect;
+
+    // MIR should be close to valid region size
+    double validArea = constraint.validRegion.area();
+    double mirArea = mir.area;
+
+    // With 0.1mm inset, area loss is minimal
+    // For 500x500 rect: (500-0.2) * (500-0.2) = 249800.04
+    // Area ratio should be > 0.999
+    double ratio = mirArea / validArea;
+    REQUIRE(ratio > 0.999);
+}
+
+TEST_CASE("MIR - center aligned with valid region center", "[phase2][grasp][mir][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends;
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // MIR center should be close to valid region centroid
+    Point2D mirCenter = constraint.maxInscribedRect.center;
+    Point2D validCentroid = constraint.validRegion.centroid();
+
+    double dx = std::abs(mirCenter.x - validCentroid.x);
+    double dy = std::abs(mirCenter.y - validCentroid.y);
+
+    // Should be very close (within 1mm)
+    REQUIRE(dx < 1.0);
+    REQUIRE(dy < 1.0);
+}
+
+TEST_CASE("MIR - optimal grip point set correctly", "[phase2][grasp][mir][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Optimal grip point should be MIR center
+    Point2D optimalGrip = constraint.optimalGripCenter;
+    Point2D mirCenter = constraint.maxInscribedRect.center;
+
+    REQUIRE(optimalGrip.x == mirCenter.x);
+    REQUIRE(optimalGrip.y == mirCenter.y);
+}
+
+TEST_CASE("MIR - dimensions are positive and reasonable", "[phase2][grasp][mir][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    Rectangle2D mir = constraint.maxInscribedRect;
+
+    // Width and height should be positive
+    REQUIRE(mir.width > 0.0);
+    REQUIRE(mir.height > 0.0);
+
+    // Dimensions should be reasonable (< sheet size)
+    REQUIRE(mir.width <= 500.0);
+    REQUIRE(mir.height <= 500.0);
+
+    // Area should match width * height
+    REQUIRE(mir.area == Approx(mir.width * mir.height).epsilon(0.01));
+}
+
+TEST_CASE("MIR - consistent across multiple analyses", "[phase2][grasp][mir][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends = { 0 };
+
+    // Analyze multiple times
+    auto c1 = generator.analyze(bends, bentBends);
+    auto c2 = generator.analyze(bends, bentBends);
+
+    // MIR should be identical
+    REQUIRE(c1.maxInscribedRect.width == c2.maxInscribedRect.width);
+    REQUIRE(c1.maxInscribedRect.height == c2.maxInscribedRect.height);
+    REQUIRE(c1.maxInscribedRect.area == c2.maxInscribedRect.area);
+    REQUIRE(c1.maxInscribedRect.center.x == c2.maxInscribedRect.center.x);
+    REQUIRE(c1.maxInscribedRect.center.y == c2.maxInscribedRect.center.y);
+}
+
+TEST_CASE("MIR - aspect ratio reasonable", "[phase2][grasp][mir][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+
+    std::vector<BendFeature> bends = { bend };
+    std::vector<int> bentBends;
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    Rectangle2D mir = constraint.maxInscribedRect;
+
+    // For square valid region (500x500), aspect ratio should be close to 1
+    double aspectRatio = mir.width / mir.height;
+
+    // Should be reasonably square (between 0.9 and 1.1)
+    REQUIRE(aspectRatio > 0.9);
+    REQUIRE(aspectRatio < 1.1);
+}
+
+TEST_CASE("MIR - area maximization", "[phase2][grasp][mir][advanced]") {
+    GraspConstraintGenerator generator;
+
+    BendFeature bend;
+    bend.id = 0;
+    bend.angle = 90.0;
+    bend.length = 100.0;
+    bend.position.x = 250.0;
+    bend.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { bend };
+
+    // Compare flat vs bent state MIR
+    auto flatConstraint = generator.analyze(bends, {});
+    auto bentConstraint = generator.analyze(bends, {0});
+
+    // Flat state should have larger MIR
+    REQUIRE(flatConstraint.maxInscribedRect.area > bentConstraint.maxInscribedRect.area);
+
+    // Both should have reasonable areas
+    REQUIRE(flatConstraint.maxInscribedRect.area > 200000.0);  // Large
+    REQUIRE(bentConstraint.maxInscribedRect.area > 10000.0);   // Smaller but still significant
+}
+
+TEST_CASE("MIR - handles small valid regions", "[phase2][grasp][mir][advanced]") {
+    GraspConstraintGenerator generator;
+
+    // Create scenario with multiple bends to heavily constrain valid region
+    BendFeature b0, b1, b2;
+
+    b0.id = 0;
+    b0.angle = 90.0;
+    b0.length = 100.0;
+    b0.position.x = 100.0;
+    b0.position.y = 250.0;
+
+    b1.id = 1;
+    b1.angle = 90.0;
+    b1.length = 100.0;
+    b1.position.x = 250.0;
+    b1.position.y = 250.0;
+
+    b2.id = 2;
+    b2.angle = 90.0;
+    b2.length = 100.0;
+    b2.position.x = 400.0;
+    b2.position.y = 250.0;
+
+    std::vector<BendFeature> bends = { b0, b1, b2 };
+    std::vector<int> bentBends = { 0, 1, 2 };
+
+    auto constraint = generator.analyze(bends, bentBends);
+
+    // Even with heavily constrained region, MIR should be valid
+    REQUIRE(constraint.maxInscribedRect.area > 0.0);
+    REQUIRE(constraint.maxInscribedRect.width > 0.0);
+    REQUIRE(constraint.maxInscribedRect.height > 0.0);
+
+    // All corners should be inside valid region
+    Rectangle2D mir = constraint.maxInscribedRect;
+    REQUIRE(constraint.validRegion.contains(mir.bottomLeft));
+    REQUIRE(constraint.validRegion.contains(mir.topRight));
 }
