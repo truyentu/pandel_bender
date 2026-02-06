@@ -272,3 +272,35 @@ target_include_directories(test_sample_parts PRIVATE
 )
 
 catch_discover_tests(test_sample_parts)
+
+# Performance benchmark tests (Task 38)
+add_executable(test_performance_benchmark
+    test_performance_benchmark.cpp
+)
+
+target_link_libraries(test_performance_benchmark PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_performance_benchmark PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_performance_benchmark)
+
+# Edge case and stress tests (Task 39)
+add_executable(test_edge_cases
+    test_edge_cases.cpp
+)
+
+target_link_libraries(test_edge_cases PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_edge_cases PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_edge_cases)
