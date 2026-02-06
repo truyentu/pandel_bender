@@ -191,3 +191,35 @@ target_include_directories(test_cycle_resolution PRIVATE
 )
 
 catch_discover_tests(test_cycle_resolution)
+
+# State optimization tests (Task 32)
+add_executable(test_state_optimization
+    test_state_optimization.cpp
+)
+
+target_link_libraries(test_state_optimization PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_state_optimization PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_state_optimization)
+
+# MIR algorithm tests (Task 33)
+add_executable(test_mir_algorithm
+    test_mir_algorithm.cpp
+)
+
+target_link_libraries(test_mir_algorithm PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_mir_algorithm PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_mir_algorithm)

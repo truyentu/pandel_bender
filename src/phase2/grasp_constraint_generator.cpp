@@ -329,23 +329,19 @@ Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
     // Maximum Inscribed Rectangle (MIR) Algorithm
     // ============================================
     //
-    // Goal: Find largest axis-aligned rectangle that fits inside valid region
+    // Algorithm: Hybrid approach
+    // --------------------------------------------------
+    // 1. First check if valid region is a simple axis-aligned rectangle
+    //    - If yes, use optimal bounding box approach (O(n))
+    //    - This is common for flat state and simple regions
+    // 2. Otherwise use grid-based sampling with binary search
+    //    - Grid sampling handles arbitrary polygons (including concave)
+    //    - Binary search efficiently finds local maximum at each point
     //
-    // Current implementation: Bounding box with inset
-    // Rationale:
-    //   - Valid region is always axis-aligned rectangle (from calculateValidRegion)
-    //   - For axis-aligned rectangular regions, bounding box IS the MIR
-    //   - Inset ensures strict containment (handles floating point precision)
-    //   - Complexity: O(n) where n = number of vertices
-    //
-    // Future enhancement for arbitrary polygons:
-    //   - Rotating calipers algorithm for convex polygons
-    //   - Grid-based sampling for concave polygons
-    //   - Dynamic programming approaches
-    //
-    // References:
-    //   - "Largest Empty Rectangle" problem
-    //   - Computational Geometry: Algorithms and Applications (de Berg et al.)
+    // Complexity:
+    //   - Simple rectangle: O(n) where n = vertices
+    //   - Complex polygon: O(G * log(D) * V)
+    //     G = number of grid points, D = dimension, V = vertices
 
     Rectangle2D mir;
 
@@ -358,8 +354,7 @@ Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
         return mir;
     }
 
-    // Step 1: Find axis-aligned bounding box
-    // This is optimal for axis-aligned rectangular regions
+    // Step 1: Find bounding box of valid region
     double minX = validRegion.vertices[0].x;
     double maxX = validRegion.vertices[0].x;
     double minY = validRegion.vertices[0].y;
@@ -372,18 +367,11 @@ Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
         if (v.y > maxY) maxY = v.y;
     }
 
-    // Step 2: Inset by small margin to ensure strict containment
-    // This handles floating point precision issues with polygon.contains()
-    // For a rectangle, points exactly on the boundary may fail containment test
-    double inset = 0.1;  // 0.1mm inset (negligible for practical purposes)
-    minX += inset;
-    maxX -= inset;
-    minY += inset;
-    maxY -= inset;
+    double bbWidth = maxX - minX;
+    double bbHeight = maxY - minY;
 
-    // Step 3: Validate dimensions
-    if (maxX <= minX || maxY <= minY) {
-        // Degenerate case - valid region too small for any rectangle
+    // Validate dimensions
+    if (bbWidth <= 0 || bbHeight <= 0) {
         mir.bottomLeft = Point2D(0, 0);
         mir.topRight = Point2D(0, 0);
         mir.width = 0;
@@ -392,15 +380,200 @@ Rectangle2D GraspConstraintGenerator::findMaxInscribedRect(
         return mir;
     }
 
-    // Step 4: Construct MIR
-    mir.bottomLeft = Point2D(minX, minY);
-    mir.topRight = Point2D(maxX, maxY);
-    mir.width = maxX - minX;
-    mir.height = maxY - minY;
-    mir.area = mir.width * mir.height;
-    mir.center = Point2D((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+    // Step 2: Check if valid region is a simple axis-aligned rectangle
+    // A rectangle has exactly 4 vertices at the bounding box corners
+    bool isSimpleRect = false;
+    if (validRegion.vertices.size() == 4) {
+        int cornerMatches = 0;
+        const double eps = 0.01;  // 0.01mm tolerance
 
-    return mir;
+        // Check if all 4 vertices match bounding box corners
+        for (const auto& v : validRegion.vertices) {
+            bool atMinX = std::abs(v.x - minX) < eps;
+            bool atMaxX = std::abs(v.x - maxX) < eps;
+            bool atMinY = std::abs(v.y - minY) < eps;
+            bool atMaxY = std::abs(v.y - maxY) < eps;
+
+            if ((atMinX || atMaxX) && (atMinY || atMaxY)) {
+                cornerMatches++;
+            }
+        }
+        isSimpleRect = (cornerMatches == 4);
+    }
+
+    // For simple rectangles, use optimal bounding box approach
+    if (isSimpleRect) {
+        // Apply small inset for strict containment
+        double inset = 0.1;  // 0.1mm inset
+        double rectMinX = minX + inset;
+        double rectMaxX = maxX - inset;
+        double rectMinY = minY + inset;
+        double rectMaxY = maxY - inset;
+
+        if (rectMaxX > rectMinX && rectMaxY > rectMinY) {
+            mir.bottomLeft = Point2D(rectMinX, rectMinY);
+            mir.topRight = Point2D(rectMaxX, rectMaxY);
+            mir.width = rectMaxX - rectMinX;
+            mir.height = rectMaxY - rectMinY;
+            mir.area = mir.width * mir.height;
+            mir.center = Point2D(
+                (rectMinX + rectMaxX) / 2.0,
+                (rectMinY + rectMaxY) / 2.0
+            );
+            return mir;
+        }
+    }
+
+    // Step 3: Grid-based sampling for complex polygons
+    const int GRID_RESOLUTION = 15;
+    double gridStepX = bbWidth / GRID_RESOLUTION;
+    double gridStepY = bbHeight / GRID_RESOLUTION;
+
+    // Minimum step size to avoid excessive precision
+    const double MIN_STEP = 1.0;  // 1mm minimum step
+    if (gridStepX < MIN_STEP) gridStepX = MIN_STEP;
+    if (gridStepY < MIN_STEP) gridStepY = MIN_STEP;
+
+    // Track best rectangle found
+    double bestArea = 0;
+    Rectangle2D bestRect;
+    bestRect.area = 0;
+
+    // Create list of sample points including center and grid points
+    std::vector<Point2D> samplePoints;
+
+    // Always include the center of the bounding box
+    samplePoints.push_back(Point2D((minX + maxX) / 2.0, (minY + maxY) / 2.0));
+
+    // Also include centroid of valid region
+    samplePoints.push_back(validRegion.centroid());
+
+    // Add grid points
+    for (double cx = minX + gridStepX/2; cx < maxX; cx += gridStepX) {
+        for (double cy = minY + gridStepY/2; cy < maxY; cy += gridStepY) {
+            samplePoints.push_back(Point2D(cx, cy));
+        }
+    }
+
+    // Step 4: For each sample point, find max rectangle
+    for (const auto& center : samplePoints) {
+        double cx = center.x;
+        double cy = center.y;
+
+        // Skip points outside valid region
+        if (!validRegion.contains(center)) {
+            continue;
+        }
+
+        // Binary search for maximum square size at this center
+        double lo = 0;
+        double hi = std::min(bbWidth, bbHeight);
+        const double TOLERANCE = 0.5;  // 0.5mm precision
+
+        while (hi - lo > TOLERANCE) {
+            double mid = (lo + hi) / 2.0;
+            double halfSize = mid / 2.0;
+
+            // Check if square centered at (cx, cy) with side 'mid' fits
+            bool fits = true;
+            Point2D corners[4] = {
+                Point2D(cx - halfSize, cy - halfSize),
+                Point2D(cx + halfSize, cy - halfSize),
+                Point2D(cx + halfSize, cy + halfSize),
+                Point2D(cx - halfSize, cy + halfSize)
+            };
+
+            for (int i = 0; i < 4 && fits; i++) {
+                if (!validRegion.contains(corners[i])) {
+                    fits = false;
+                }
+            }
+
+            if (fits) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+
+        double squareSize = lo;
+        if (squareSize <= 0) continue;
+
+        // Try different aspect ratios to find best rectangle
+        const double ASPECT_RATIOS[] = {1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 0.8, 0.67, 0.5, 0.4, 0.33};
+        const int NUM_RATIOS = 11;
+
+        for (int r = 0; r < NUM_RATIOS; r++) {
+            double ratio = ASPECT_RATIOS[r];
+            double testWidth, testHeight;
+
+            if (ratio >= 1.0) {
+                testHeight = squareSize;
+                testWidth = squareSize * ratio;
+            } else {
+                testWidth = squareSize;
+                testHeight = squareSize / ratio;
+            }
+
+            // Clamp to bounding box
+            if (testWidth > bbWidth) testWidth = bbWidth;
+            if (testHeight > bbHeight) testHeight = bbHeight;
+
+            double halfW = testWidth / 2.0;
+            double halfH = testHeight / 2.0;
+
+            // Check if this rectangle fits
+            Point2D rectCorners[4] = {
+                Point2D(cx - halfW, cy - halfH),
+                Point2D(cx + halfW, cy - halfH),
+                Point2D(cx + halfW, cy + halfH),
+                Point2D(cx - halfW, cy + halfH)
+            };
+
+            bool rectFits = true;
+            for (int i = 0; i < 4 && rectFits; i++) {
+                if (!validRegion.contains(rectCorners[i])) {
+                    rectFits = false;
+                }
+            }
+
+            if (rectFits) {
+                double area = testWidth * testHeight;
+                if (area > bestArea) {
+                    bestArea = area;
+                    bestRect.bottomLeft = Point2D(cx - halfW, cy - halfH);
+                    bestRect.topRight = Point2D(cx + halfW, cy + halfH);
+                    bestRect.width = testWidth;
+                    bestRect.height = testHeight;
+                    bestRect.area = area;
+                    bestRect.center = Point2D(cx, cy);
+                }
+            }
+        }
+    }
+
+    // Step 5: Fallback to bounding box if nothing found
+    if (bestArea <= 0) {
+        double inset = 0.1;
+        double fallbackMinX = minX + inset;
+        double fallbackMaxX = maxX - inset;
+        double fallbackMinY = minY + inset;
+        double fallbackMaxY = maxY - inset;
+
+        if (fallbackMaxX > fallbackMinX && fallbackMaxY > fallbackMinY) {
+            bestRect.bottomLeft = Point2D(fallbackMinX, fallbackMinY);
+            bestRect.topRight = Point2D(fallbackMaxX, fallbackMaxY);
+            bestRect.width = fallbackMaxX - fallbackMinX;
+            bestRect.height = fallbackMaxY - fallbackMinY;
+            bestRect.area = bestRect.width * bestRect.height;
+            bestRect.center = Point2D(
+                (fallbackMinX + fallbackMaxX) / 2.0,
+                (fallbackMinY + fallbackMaxY) / 2.0
+            );
+        }
+    }
+
+    return bestRect;
 }
 
 bool GraspConstraintGenerator::validateGripPhysics(
