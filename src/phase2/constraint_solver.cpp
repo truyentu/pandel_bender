@@ -37,20 +37,33 @@ Phase2Output ConstraintSolver::solve(const std::vector<phase1::BendFeature>& ben
         ).count() / 1000.0;
         m_stats.totalEdges = output.precedenceGraph.edgeCount();
 
-        // Step 2: Grasp constraint analysis
+        // Step 2: Grasp constraint analysis (using progressive sequence)
         auto graspStart = std::chrono::high_resolution_clock::now();
 
-        // Generate grasp constraints for key states:
-        // 1. Flat state (no bends)
-        GraspConstraint flatState = m_graspGenerator.analyze(bends, std::vector<int>());
+        // Use bend ID order for initial analysis
+        std::vector<int> preliminaryOrder;
+        for (const auto& bend : bends) {
+            preliminaryOrder.push_back(bend.id);
+        }
+
+        // Generate grasp constraints for progressive states:
+        // State 0: Flat (no bends)
+        // State 1: After bend[0]
+        // State 2: After bend[0], bend[1]
+        // ... etc
+        // This is O(n) instead of O(2^n) for exponential enumeration
+
+        std::vector<int> progressiveBends;
+
+        // Flat state
+        GraspConstraint flatState = m_graspGenerator.analyze(bends, progressiveBends);
         output.graspConstraints.push_back(flatState);
 
-        // 2. Each single bend state
-        for (const auto& bend : bends) {
-            GraspConstraint singleBendState = m_graspGenerator.analyze(
-                bends, std::vector<int>{bend.id}
-            );
-            output.graspConstraints.push_back(singleBendState);
+        // Progressive states following order
+        for (int bendId : preliminaryOrder) {
+            progressiveBends.push_back(bendId);
+            GraspConstraint state = m_graspGenerator.analyze(bends, progressiveBends);
+            output.graspConstraints.push_back(state);
         }
 
         auto graspEnd = std::chrono::high_resolution_clock::now();
