@@ -86,6 +86,22 @@ public:
     bool isAcyclic();
 
     /**
+     * @brief Resolve cycles by removing lowest confidence edges
+     *
+     * Iteratively removes the lowest confidence edge from each detected
+     * cycle until the graph becomes acyclic. The algorithm:
+     * 1. While graph has cycles
+     * 2. Find all edges involved in cycles
+     * 3. Find lowest confidence edge
+     * 4. Remove that edge
+     * 5. Rebuild adjacency lists
+     * 6. Repeat until acyclic
+     *
+     * @return Vector of removed edges
+     */
+    std::vector<PrecedenceEdge> resolveCycles();
+
+    /**
      * @brief Get topological ordering using Kahn's algorithm
      * @return Vector of node IDs in valid topological order (empty if cyclic)
      */
@@ -98,6 +114,15 @@ private:
 
     // Helper for cycle detection (DFS)
     bool hasCycleDFS(int nodeId, std::vector<int>& state);
+
+    // Helper for finding edges in cycles
+    std::vector<int> findEdgesInCycles();
+
+    // Helper for removing an edge by index
+    void removeEdge(int edgeIndex);
+
+    // Helper for rebuilding adjacency lists after edge removal
+    void rebuildAdjacencyLists();
 };
 
 } // namespace phase2

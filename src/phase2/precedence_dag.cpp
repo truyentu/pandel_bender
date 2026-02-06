@@ -105,16 +105,23 @@ bool PrecedenceDAG::finalize() {
     }
 
     // BFS from all roots to calculate levels
+    // Use a visit counter to prevent infinite loops in case of cycles
+    std::vector<int> visitCount(m_nodes.size(), 0);
+    int maxVisits = static_cast<int>(m_nodes.size()) * static_cast<int>(m_nodes.size()) + 1;
+    int totalVisits = 0;
+
     std::queue<int> queue;
     for (int rootId : roots) {
         queue.push(rootId);
     }
 
-    while (!queue.empty()) {
+    while (!queue.empty() && totalVisits < maxVisits) {
         int currentId = queue.front();
         queue.pop();
 
         PrecedenceNode& currentNode = m_nodes[currentId];
+        visitCount[currentId]++;
+        totalVisits++;
 
         // Process all successors
         for (int successorBendId : currentNode.successors) {
@@ -125,7 +132,10 @@ bool PrecedenceDAG::finalize() {
                     int newLevel = currentNode.level + 1;
                     if (newLevel > node.level) {
                         node.level = newLevel;
-                        queue.push(node.id);
+                        // Only queue if not visited too many times (prevents cycle infinite loop)
+                        if (visitCount[node.id] < static_cast<int>(m_nodes.size())) {
+                            queue.push(node.id);
+                        }
                     }
                     break;
                 }
@@ -259,6 +269,160 @@ bool PrecedenceDAG::hasCycleDFS(int nodeId, std::vector<int>& state) {
     state[nodeId] = 2;
 
     return false;  // No cycle found from this node
+}
+
+std::vector<int> PrecedenceDAG::findEdgesInCycles() {
+    std::vector<int> edgesInCycles;
+
+    // For each edge, check if removing it would affect cycle detection
+    // An edge is in a cycle if there's a path from toBend back to fromBend
+    for (size_t edgeIdx = 0; edgeIdx < m_edges.size(); edgeIdx++) {
+        const PrecedenceEdge& edge = m_edges[edgeIdx];
+
+        // Find the target node
+        int targetNodeId = -1;
+        int sourceNodeId = -1;
+        for (size_t i = 0; i < m_nodes.size(); i++) {
+            if (m_nodes[i].bendId == edge.toBend) {
+                targetNodeId = static_cast<int>(i);
+            }
+            if (m_nodes[i].bendId == edge.fromBend) {
+                sourceNodeId = static_cast<int>(i);
+            }
+        }
+
+        if (targetNodeId == -1 || sourceNodeId == -1) {
+            continue;
+        }
+
+        // BFS to check if there's a path from toBend to fromBend
+        std::vector<bool> visited(m_nodes.size(), false);
+        std::queue<int> queue;
+        queue.push(targetNodeId);
+        visited[targetNodeId] = true;
+
+        bool foundPath = false;
+        while (!queue.empty() && !foundPath) {
+            int currentId = queue.front();
+            queue.pop();
+
+            const PrecedenceNode& currentNode = m_nodes[currentId];
+
+            for (int successorBendId : currentNode.successors) {
+                // Find successor node
+                for (size_t i = 0; i < m_nodes.size(); i++) {
+                    if (m_nodes[i].bendId == successorBendId) {
+                        if (static_cast<int>(i) == sourceNodeId) {
+                            // Found path back to source - this edge is in a cycle
+                            foundPath = true;
+                            break;
+                        }
+                        if (!visited[i]) {
+                            visited[i] = true;
+                            queue.push(static_cast<int>(i));
+                        }
+                        break;
+                    }
+                }
+                if (foundPath) break;
+            }
+        }
+
+        if (foundPath) {
+            edgesInCycles.push_back(static_cast<int>(edgeIdx));
+        }
+    }
+
+    return edgesInCycles;
+}
+
+void PrecedenceDAG::removeEdge(int edgeIndex) {
+    if (edgeIndex < 0 || edgeIndex >= static_cast<int>(m_edges.size())) {
+        return;
+    }
+
+    // Remove the edge from the vector
+    m_edges.erase(m_edges.begin() + edgeIndex);
+
+    // Update edge IDs for remaining edges
+    for (size_t i = 0; i < m_edges.size(); i++) {
+        m_edges[i].id = static_cast<int>(i);
+    }
+}
+
+void PrecedenceDAG::rebuildAdjacencyLists() {
+    // Clear all adjacency lists
+    for (auto& node : m_nodes) {
+        node.successors.clear();
+        node.predecessors.clear();
+    }
+
+    // Rebuild from edges
+    for (const auto& edge : m_edges) {
+        for (auto& node : m_nodes) {
+            if (node.bendId == edge.fromBend) {
+                node.successors.push_back(edge.toBend);
+            }
+            if (node.bendId == edge.toBend) {
+                node.predecessors.push_back(edge.fromBend);
+            }
+        }
+    }
+
+    m_finalized = false;
+}
+
+std::vector<PrecedenceEdge> PrecedenceDAG::resolveCycles() {
+    std::vector<PrecedenceEdge> removedEdges;
+
+    // Handle empty graph
+    if (m_nodes.empty()) {
+        return removedEdges;
+    }
+
+    // Iteratively remove lowest confidence edges until acyclic
+    // Add a safety limit to prevent infinite loops
+    int maxIterations = static_cast<int>(m_edges.size()) + 1;
+    int iteration = 0;
+
+    while (!isAcyclic() && iteration < maxIterations) {
+        iteration++;
+
+        // Find all edges that are part of cycles
+        std::vector<int> edgesInCycles = findEdgesInCycles();
+
+        if (edgesInCycles.empty()) {
+            // No edges in cycles found but graph is cyclic - shouldn't happen
+            break;
+        }
+
+        // Find the edge with lowest confidence among those in cycles
+        int lowestConfidenceIdx = edgesInCycles[0];
+        double lowestConfidence = m_edges[lowestConfidenceIdx].confidence;
+
+        for (int edgeIdx : edgesInCycles) {
+            if (m_edges[edgeIdx].confidence < lowestConfidence) {
+                lowestConfidence = m_edges[edgeIdx].confidence;
+                lowestConfidenceIdx = edgeIdx;
+            }
+        }
+
+        // Store the removed edge before removing it
+        removedEdges.push_back(m_edges[lowestConfidenceIdx]);
+
+        // Remove the edge
+        removeEdge(lowestConfidenceIdx);
+
+        // Rebuild adjacency lists
+        rebuildAdjacencyLists();
+    }
+
+    // Now that graph is acyclic (or we gave up), finalize it
+    if (isAcyclic()) {
+        finalize();
+    }
+
+    return removedEdges;
 }
 
 } // namespace phase2

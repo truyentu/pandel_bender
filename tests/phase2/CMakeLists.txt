@@ -175,3 +175,19 @@ target_include_directories(test_constraint_solver_e2e PRIVATE
 )
 
 catch_discover_tests(test_constraint_solver_e2e)
+
+# Cycle resolution tests
+add_executable(test_cycle_resolution
+    test_cycle_resolution.cpp
+)
+
+target_link_libraries(test_cycle_resolution PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_cycle_resolution PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_cycle_resolution)
