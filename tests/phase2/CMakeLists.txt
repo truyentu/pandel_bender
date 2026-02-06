@@ -223,3 +223,52 @@ target_include_directories(test_mir_algorithm PRIVATE
 )
 
 catch_discover_tests(test_mir_algorithm)
+
+# Subset sum algorithm tests (Task 34)
+add_executable(test_subset_sum
+    test_subset_sum.cpp
+)
+
+target_link_libraries(test_subset_sum PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_subset_sum PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_subset_sum)
+
+# Phase 1 Integration tests (Task 36)
+add_executable(test_phase1_integration
+    test_phase1_integration.cpp
+)
+
+target_link_libraries(test_phase1_integration PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_phase1_integration PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_phase1_integration)
+
+# Sample parts fixtures tests (Task 35)
+add_executable(test_sample_parts
+    test_sample_parts.cpp
+)
+
+target_link_libraries(test_sample_parts PRIVATE
+    openpanelcam_phase2
+    Catch2::Catch2WithMain
+)
+
+target_include_directories(test_sample_parts PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+catch_discover_tests(test_sample_parts)
