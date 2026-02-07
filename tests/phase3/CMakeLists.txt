@@ -28,3 +28,17 @@ target_include_directories(test_zobrist PRIVATE
 )
 
 catch_discover_tests(test_zobrist)
+
+# Test for cost function (MaskedTimeCost + BendTimeEstimator)
+add_executable(test_cost_function test_cost_function.cpp)
+
+target_link_libraries(test_cost_function PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase3
+)
+
+target_include_directories(test_cost_function PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_cost_function)
