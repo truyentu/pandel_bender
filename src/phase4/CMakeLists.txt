@@ -4,6 +4,9 @@
 
 add_library(openpanelcam_phase4 STATIC
     collision_primitives.cpp
+    swept_volume.cpp
+    bent_state.cpp
+    collision_detector.cpp
 )
 
 target_include_directories(openpanelcam_phase4 PUBLIC

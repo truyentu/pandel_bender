@@ -15,3 +15,17 @@ target_include_directories(test_phase4_types PRIVATE
 )
 
 catch_discover_tests(test_phase4_types)
+
+# Test for swept volume, bent state, and collision detector
+add_executable(test_collision test_collision.cpp)
+
+target_link_libraries(test_collision PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_collision PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_collision)
