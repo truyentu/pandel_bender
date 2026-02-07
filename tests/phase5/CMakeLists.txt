@@ -99,3 +99,45 @@ target_include_directories(test_post_processor PRIVATE
 )
 
 catch_discover_tests(test_post_processor)
+
+# Test for edge cases
+add_executable(test_phase5_edge_cases test_phase5_edge_cases.cpp)
+
+target_link_libraries(test_phase5_edge_cases PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase5
+)
+
+target_include_directories(test_phase5_edge_cases PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_phase5_edge_cases)
+
+# Test for performance
+add_executable(test_phase5_performance test_phase5_performance.cpp)
+
+target_link_libraries(test_phase5_performance PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase5
+)
+
+target_include_directories(test_phase5_performance PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_phase5_performance)
+
+# Integration tests (Phase 2 -> 3 -> 4 -> 5)
+add_executable(test_phase5_integration test_integration.cpp)
+
+target_link_libraries(test_phase5_integration PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase5
+)
+
+target_include_directories(test_phase5_integration PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_phase5_integration)
