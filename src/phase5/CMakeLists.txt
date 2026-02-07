@@ -4,6 +4,9 @@
 
 add_library(openpanelcam_phase5 STATIC
     instruction_builder.cpp
+    animation_builder.cpp
+    xml_generator.cpp
+    json_generator.cpp
 )
 
 target_include_directories(openpanelcam_phase5 PUBLIC
