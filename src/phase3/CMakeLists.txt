@@ -2,9 +2,24 @@
 # OpenPanelCAM Phase 3: Sequencer
 #==============================================================================
 
-# TODO: Implement Phase 3
+add_library(openpanelcam_phase3 STATIC
+    zobrist_table.cpp
+    cost_function.cpp
+    heuristic.cpp
+    successor_generator.cpp
+    astar_search.cpp
+    sequencer.cpp
+)
 
-message(STATUS "Phase 3: Sequencer - Not implemented yet")
+target_include_directories(openpanelcam_phase3 PUBLIC
+    ${CMAKE_SOURCE_DIR}/include
+)
 
-add_library(openpanelcam_phase3 INTERFACE)
-target_link_libraries(openpanelcam_phase3 INTERFACE openpanelcam_core)
+target_link_libraries(openpanelcam_phase3 PUBLIC
+    openpanelcam_phase2
+)
+
+set_target_properties(openpanelcam_phase3 PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)

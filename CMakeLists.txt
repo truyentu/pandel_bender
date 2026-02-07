@@ -130,8 +130,8 @@ if(OpenCASCADE_FOUND)
     add_subdirectory(src/phase1)
 endif()
 add_subdirectory(src/phase2)
+add_subdirectory(src/phase3)
 # TODO: Enable when dependencies are ready
-# add_subdirectory(src/phase3)
 # add_subdirectory(src/phase4)
 # add_subdirectory(src/phase5)
 

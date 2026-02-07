@@ -47,6 +47,13 @@ public:
     const PrecedenceNode* getNode(int nodeId) const;
 
     /**
+     * @brief Get node by bend ID
+     * @param bendId Bend ID from Phase 1
+     * @return Pointer to node, or nullptr if not found
+     */
+    const PrecedenceNode* getNodeByBendId(int bendId) const;
+
+    /**
      * @brief Get edge by ID (const version)
      * @param edgeId Edge ID
      * @return Pointer to edge, or nullptr if not found
