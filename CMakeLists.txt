@@ -132,7 +132,7 @@ endif()
 add_subdirectory(src/phase2)
 add_subdirectory(src/phase3)
 add_subdirectory(src/phase4)
-# add_subdirectory(src/phase5)
+add_subdirectory(src/phase5)
 
 # Tests
 if(OPENPANELCAM_BUILD_TESTS)
