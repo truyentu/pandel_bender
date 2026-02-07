@@ -126,3 +126,17 @@ target_include_directories(test_performance PRIVATE
 )
 
 catch_discover_tests(test_performance)
+
+# Edge case and stress tests
+add_executable(test_phase3_edge_cases test_edge_cases.cpp)
+
+target_link_libraries(test_phase3_edge_cases PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase3
+)
+
+target_include_directories(test_phase3_edge_cases PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_phase3_edge_cases)

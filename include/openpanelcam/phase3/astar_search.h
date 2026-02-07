@@ -17,6 +17,8 @@ namespace phase3 {
 struct SearchConfig {
     int maxNodes = 1000000;
     double timeoutSeconds = 30.0;
+    bool useBeamSearch = true;   // Auto-fallback to beam search if A* fails
+    int beamWidth = 100;         // Beam width for beam search fallback
 };
 
 /**
@@ -45,6 +47,8 @@ private:
     Phase3Output reconstructPath(const std::vector<SearchNode>& allNodes,
                                   int goalNodeIndex);
     bool isGoal(const SearchState& state) const;
+    Phase3Output beamSearch(const SearchConfig& config,
+                            std::chrono::high_resolution_clock::time_point startTime);
 };
 
 } // namespace phase3

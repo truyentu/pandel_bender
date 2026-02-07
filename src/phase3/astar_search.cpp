@@ -130,6 +130,107 @@ Phase3Output AStarSearch::search(const SearchConfig& config) {
     m_stats.searchTimeMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
     output.stats = m_stats;
 
+    // Beam search fallback if A* didn't find a solution
+    if (!output.success && config.useBeamSearch) {
+        output.warnings.push_back("A* exhausted (" + output.errorMessage + "), falling back to beam search");
+        output = beamSearch(config, startTime);
+    }
+
+    return output;
+}
+
+Phase3Output AStarSearch::beamSearch(const SearchConfig& config,
+                                      std::chrono::high_resolution_clock::time_point startTime) {
+    Phase3Output output;
+    SequencerStatistics beamStats;
+    beamStats.nodesGenerated = 1;
+
+    std::vector<SearchNode> allNodes;
+
+    // Start with initial node
+    SearchNode startNode = SearchNode::createInitial();
+    startNode.h = m_heuristic.estimate(startNode.state, m_bends);
+    allNodes.push_back(startNode);
+
+    // Current beam: indices into allNodes
+    std::vector<int> currentBeam = {0};
+
+    int totalBends = static_cast<int>(m_bends.size());
+
+    for (int depth = 0; depth < totalBends; depth++) {
+        // Check timeout
+        auto elapsed = std::chrono::high_resolution_clock::now() - startTime;
+        if (std::chrono::duration<double>(elapsed).count() > config.timeoutSeconds * 2.0) {
+            output.errorMessage = "Beam search timeout";
+            break;
+        }
+
+        // Expand all nodes in current beam
+        std::vector<std::pair<double, int>> candidates; // (f-score, nodeIdx)
+
+        for (int beamIdx : currentBeam) {
+            const SearchNode& current = allNodes[beamIdx];
+            beamStats.nodesExpanded++;
+
+            if (isGoal(current.state)) {
+                output = reconstructPath(allNodes, beamIdx);
+                output.success = true;
+                output.optimal = false; // Beam search is not optimal
+                output.warnings.push_back("Solution found by beam search (may not be optimal)");
+                auto endTime = std::chrono::high_resolution_clock::now();
+                beamStats.searchTimeMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+                beamStats.solutionDepth = static_cast<int>(output.bendSequence.size());
+                output.stats = beamStats;
+                return output;
+            }
+
+            auto successors = m_successor->generate(current, beamIdx, m_costFn, m_heuristic);
+            beamStats.nodesGenerated += static_cast<int>(successors.size());
+
+            for (auto& succ : successors) {
+                int newIdx = static_cast<int>(allNodes.size());
+                allNodes.push_back(succ);
+                candidates.push_back({succ.f(), newIdx});
+            }
+        }
+
+        if (candidates.empty()) break;
+
+        // Sort by f-score and keep only top beamWidth
+        std::sort(candidates.begin(), candidates.end());
+        int keepCount = std::min(config.beamWidth, static_cast<int>(candidates.size()));
+
+        currentBeam.clear();
+        for (int i = 0; i < keepCount; i++) {
+            currentBeam.push_back(candidates[i].second);
+        }
+
+        beamStats.nodesPruned += static_cast<int>(candidates.size()) - keepCount;
+        beamStats.maxOpenSetSize = std::max(beamStats.maxOpenSetSize, keepCount);
+    }
+
+    // Check if any node in final beam is a goal
+    for (int beamIdx : currentBeam) {
+        if (isGoal(allNodes[beamIdx].state)) {
+            output = reconstructPath(allNodes, beamIdx);
+            output.success = true;
+            output.optimal = false;
+            output.warnings.push_back("Solution found by beam search (may not be optimal)");
+            break;
+        }
+    }
+
+    auto endTime = std::chrono::high_resolution_clock::now();
+    beamStats.searchTimeMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+    if (output.success) {
+        beamStats.solutionDepth = static_cast<int>(output.bendSequence.size());
+    }
+    output.stats = beamStats;
+
+    if (!output.success) {
+        output.errorMessage = "Beam search failed to find solution";
+    }
+
     return output;
 }
 
