@@ -71,3 +71,45 @@ target_include_directories(test_sequence_validator PRIVATE
 )
 
 catch_discover_tests(test_sequence_validator)
+
+# Edge case tests
+add_executable(test_phase4_edge_cases test_phase4_edge_cases.cpp)
+
+target_link_libraries(test_phase4_edge_cases PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_phase4_edge_cases PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_phase4_edge_cases)
+
+# Performance benchmarks
+add_executable(test_phase4_performance test_phase4_performance.cpp)
+
+target_link_libraries(test_phase4_performance PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_phase4_performance PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_phase4_performance)
+
+# Integration tests (Phase 2 -> 3 -> 4)
+add_executable(test_phase4_integration test_integration.cpp)
+
+target_link_libraries(test_phase4_integration PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_phase4_integration PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_phase4_integration)
