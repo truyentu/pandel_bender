@@ -2,9 +2,19 @@
 # OpenPanelCAM Phase 4: Physics Validator
 #==============================================================================
 
-# TODO: Implement Phase 4
+add_library(openpanelcam_phase4 STATIC
+    collision_primitives.cpp
+)
 
-message(STATUS "Phase 4: Physics Validator - Not implemented yet")
+target_include_directories(openpanelcam_phase4 PUBLIC
+    ${CMAKE_SOURCE_DIR}/include
+)
 
-add_library(openpanelcam_phase4 INTERFACE)
-target_link_libraries(openpanelcam_phase4 INTERFACE openpanelcam_core)
+target_link_libraries(openpanelcam_phase4 PUBLIC
+    openpanelcam_phase3
+)
+
+set_target_properties(openpanelcam_phase4 PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
