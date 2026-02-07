@@ -42,3 +42,17 @@ target_include_directories(test_cost_function PRIVATE
 )
 
 catch_discover_tests(test_cost_function)
+
+# Test for heuristics (H1, H2, H3, Combined)
+add_executable(test_heuristic test_heuristic.cpp)
+
+target_link_libraries(test_heuristic PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase3
+)
+
+target_include_directories(test_heuristic PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_heuristic)

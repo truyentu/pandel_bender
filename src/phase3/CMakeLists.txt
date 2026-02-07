@@ -5,6 +5,7 @@
 add_library(openpanelcam_phase3 STATIC
     zobrist_table.cpp
     cost_function.cpp
+    heuristic.cpp
 )
 
 target_include_directories(openpanelcam_phase3 PUBLIC
