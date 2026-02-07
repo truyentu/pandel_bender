@@ -29,3 +29,31 @@ target_include_directories(test_collision PRIVATE
 )
 
 catch_discover_tests(test_collision)
+
+# Test for grasp physics engine
+add_executable(test_grasp_physics test_grasp_physics.cpp)
+
+target_link_libraries(test_grasp_physics PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_grasp_physics PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_grasp_physics)
+
+# Test for extraction checker and springback compensator
+add_executable(test_extraction test_extraction.cpp)
+
+target_link_libraries(test_extraction PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_extraction PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_extraction)

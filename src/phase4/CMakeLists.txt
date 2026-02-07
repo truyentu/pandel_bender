@@ -7,6 +7,8 @@ add_library(openpanelcam_phase4 STATIC
     swept_volume.cpp
     bent_state.cpp
     collision_detector.cpp
+    grasp_physics.cpp
+    extraction_checker.cpp
 )
 
 target_include_directories(openpanelcam_phase4 PUBLIC
