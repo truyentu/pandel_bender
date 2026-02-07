@@ -59,5 +59,62 @@ inline Orientation rotateOpposite(Orientation o) {
     return static_cast<Orientation>((static_cast<uint8_t>(o) + 2) % 4);
 }
 
+/**
+ * @brief Search state in A* algorithm
+ *
+ * Encodes the complete state of the bending process:
+ * - Which bends are completed (bitmask, max 32 bends)
+ * - Current part orientation
+ * - Current ABA segment configuration
+ * - Current grip center position
+ * - Whether repo is needed
+ */
+struct SearchState {
+    uint32_t bentMask = 0;
+    Orientation orientation = Orientation::DEG_0;
+    uint16_t abaConfig = 0;
+    double gripCenterX = 0.0;
+    double gripCenterY = 0.0;
+    bool needsRepo = false;
+    RepoReason repoReason = RepoReason::NONE;
+
+    bool isBent(int bendId) const {
+        if (bendId < 0 || bendId >= 32) return false;
+        return (bentMask & (1u << bendId)) != 0;
+    }
+
+    void markBent(int bendId) {
+        if (bendId >= 0 && bendId < 32) {
+            bentMask |= (1u << bendId);
+        }
+    }
+
+    int bentCount() const {
+        int count = 0;
+        uint32_t mask = bentMask;
+        while (mask) {
+            count += mask & 1;
+            mask >>= 1;
+        }
+        return count;
+    }
+
+    bool isGoal(int totalBends) const {
+        if (totalBends <= 0 || totalBends > 32) return false;
+        uint32_t goalMask = (1u << totalBends) - 1;
+        return bentMask == goalMask;
+    }
+
+    bool operator==(const SearchState& other) const {
+        return bentMask == other.bentMask &&
+               orientation == other.orientation &&
+               abaConfig == other.abaConfig;
+    }
+
+    bool operator!=(const SearchState& other) const {
+        return !(*this == other);
+    }
+};
+
 } // namespace phase3
 } // namespace openpanelcam
