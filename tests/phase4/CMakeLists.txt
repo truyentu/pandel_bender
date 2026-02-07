@@ -57,3 +57,17 @@ target_include_directories(test_extraction PRIVATE
 )
 
 catch_discover_tests(test_extraction)
+
+# Test for sequence validator and feedback generator
+add_executable(test_sequence_validator test_sequence_validator.cpp)
+
+target_link_libraries(test_sequence_validator PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_sequence_validator PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_sequence_validator)

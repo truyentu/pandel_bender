@@ -202,7 +202,7 @@ struct ValidatorConfig {
     double minGripArea = 100.0;
     double maxComDistance = 50.0;
     double maxTorque = 10.0;
-    double maxShearForce = 50.0;
+    double maxShearForce = 200.0;
     double frictionCoeff = 0.3;
 
     double collisionMargin = 2.0;

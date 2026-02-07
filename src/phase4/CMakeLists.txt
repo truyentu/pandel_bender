@@ -9,6 +9,7 @@ add_library(openpanelcam_phase4 STATIC
     collision_detector.cpp
     grasp_physics.cpp
     extraction_checker.cpp
+    sequence_validator.cpp
 )
 
 target_include_directories(openpanelcam_phase4 PUBLIC

@@ -26,7 +26,7 @@ TEST_CASE("GraspPhysicsEngine default construction", "[phase4][grasp]") {
     REQUIRE(engine.config().minGripArea == 100.0);
     REQUIRE(engine.config().maxComDistance == 50.0);
     REQUIRE(engine.config().maxTorque == 10.0);
-    REQUIRE(engine.config().maxShearForce == 50.0);
+    REQUIRE(engine.config().maxShearForce == 200.0);
 }
 
 TEST_CASE("GraspPhysicsEngine custom config", "[phase4][grasp]") {
