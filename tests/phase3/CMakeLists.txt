@@ -70,3 +70,17 @@ target_include_directories(test_successor PRIVATE
 )
 
 catch_discover_tests(test_successor)
+
+# Test for A* search engine
+add_executable(test_astar test_astar.cpp)
+
+target_link_libraries(test_astar PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase3
+)
+
+target_include_directories(test_astar PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_astar)

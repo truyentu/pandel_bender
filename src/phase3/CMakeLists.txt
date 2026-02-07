@@ -7,6 +7,7 @@ add_library(openpanelcam_phase3 STATIC
     cost_function.cpp
     heuristic.cpp
     successor_generator.cpp
+    astar_search.cpp
 )
 
 target_include_directories(openpanelcam_phase3 PUBLIC
