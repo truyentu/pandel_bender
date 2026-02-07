@@ -71,3 +71,31 @@ target_include_directories(test_json_generator PRIVATE
 )
 
 catch_discover_tests(test_json_generator)
+
+# Test for output validator
+add_executable(test_output_validator test_output_validator.cpp)
+
+target_link_libraries(test_output_validator PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase5
+)
+
+target_include_directories(test_output_validator PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_output_validator)
+
+# Test for post processor pipeline
+add_executable(test_post_processor test_post_processor.cpp)
+
+target_link_libraries(test_post_processor PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase5
+)
+
+target_include_directories(test_post_processor PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_post_processor)
