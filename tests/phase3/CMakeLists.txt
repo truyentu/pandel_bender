@@ -98,3 +98,31 @@ target_include_directories(test_sequencer PRIVATE
 )
 
 catch_discover_tests(test_sequencer)
+
+# Test for RepoTriggerDetector + repo integration
+add_executable(test_repo test_repo.cpp)
+
+target_link_libraries(test_repo PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase3
+)
+
+target_include_directories(test_repo PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_repo)
+
+# Performance benchmarks
+add_executable(test_performance test_performance.cpp)
+
+target_link_libraries(test_performance PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase3
+)
+
+target_include_directories(test_performance PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_performance)

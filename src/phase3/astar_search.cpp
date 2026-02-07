@@ -154,8 +154,36 @@ Phase3Output AStarSearch::reconstructPath(const std::vector<SearchNode>& allNode
 
     output.totalCycleTime = allNodes[goalNodeIndex].g;
 
-    // Generate detailed actions
-    for (int bendId : output.bendSequence) {
+    // Generate detailed actions and track repos
+    // Collect nodes in forward order for repo detection
+    std::vector<int> forwardNodeIndices;
+    {
+        int idx = goalNodeIndex;
+        while (idx >= 0) {
+            forwardNodeIndices.push_back(idx);
+            idx = allNodes[idx].parentId;
+        }
+        std::reverse(forwardNodeIndices.begin(), forwardNodeIndices.end());
+    }
+
+    output.repoCount = 0;
+    for (size_t i = 1; i < forwardNodeIndices.size(); i++) {
+        const SearchNode& node = allNodes[forwardNodeIndices[i]];
+        int bendId = node.lastBendId;
+        if (bendId < 0) continue;
+
+        // Check if repo was triggered at this step
+        if (node.state.needsRepo) {
+            SequenceAction repoAction;
+            repoAction.type = ActionType::REPOSITION;
+            repoAction.duration = m_costFn.repoTime(true);
+            repoAction.description = "Reposition (reason: " +
+                std::to_string(static_cast<int>(node.state.repoReason)) + ")";
+            output.actions.push_back(repoAction);
+            output.repoCount++;
+            output.repoAfterBends.push_back(bendId);
+        }
+
         SequenceAction action;
         action.type = ActionType::BEND;
         action.bendId = bendId;
