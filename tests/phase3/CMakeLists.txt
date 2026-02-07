@@ -84,3 +84,17 @@ target_include_directories(test_astar PRIVATE
 )
 
 catch_discover_tests(test_astar)
+
+# Test for Sequencer main class + integration
+add_executable(test_sequencer test_sequencer.cpp)
+
+target_link_libraries(test_sequencer PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase3
+)
+
+target_include_directories(test_sequencer PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_sequencer)

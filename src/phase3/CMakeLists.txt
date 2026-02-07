@@ -8,6 +8,7 @@ add_library(openpanelcam_phase3 STATIC
     heuristic.cpp
     successor_generator.cpp
     astar_search.cpp
+    sequencer.cpp
 )
 
 target_include_directories(openpanelcam_phase3 PUBLIC
