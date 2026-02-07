@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include "openpanelcam/phase3/types.h"
 
 using namespace openpanelcam::phase3;
@@ -144,4 +145,96 @@ TEST_CASE("SearchState equality ignores grip", "[phase3][types][state]") {
 
     s2.bentMask = 0b111;
     REQUIRE(s1 != s2);  // Now different
+}
+
+// ===== SearchNode Tests =====
+
+TEST_CASE("SearchNode default values", "[phase3][types][node]") {
+    SearchNode node;
+
+    REQUIRE(node.g == 0.0);
+    REQUIRE(node.h == 0.0);
+    REQUIRE(node.f() == 0.0);
+    REQUIRE(node.parentId == -1);
+    REQUIRE(node.lastBendId == -1);
+}
+
+TEST_CASE("SearchNode f() computes g + h", "[phase3][types][node]") {
+    SearchNode node;
+    node.g = 10.5;
+    node.h = 5.3;
+
+    REQUIRE(node.f() == Catch::Approx(15.8));
+}
+
+TEST_CASE("SearchNode comparison for min-heap", "[phase3][types][node]") {
+    SearchNode low, high;
+    low.g = 5.0;
+    low.h = 2.0;  // f = 7
+
+    high.g = 10.0;
+    high.h = 3.0;  // f = 13
+
+    REQUIRE(high > low);
+    REQUIRE(!(low > high));
+}
+
+TEST_CASE("SearchNode createInitial returns flat state", "[phase3][types][node]") {
+    auto node = SearchNode::createInitial();
+
+    REQUIRE(node.state.bentMask == 0);
+    REQUIRE(node.state.orientation == Orientation::DEG_0);
+    REQUIRE(node.g == 0.0);
+    REQUIRE(node.h == 0.0);
+    REQUIRE(node.parentId == -1);
+    REQUIRE(node.lastBendId == -1);
+}
+
+TEST_CASE("SequenceAction stores action details", "[phase3][types][action]") {
+    SequenceAction action;
+    action.type = ActionType::BEND;
+    action.bendId = 3;
+    action.duration = 2.5;
+    action.description = "Bend flange 3 at 90 degrees";
+
+    REQUIRE(action.type == ActionType::BEND);
+    REQUIRE(action.bendId == 3);
+    REQUIRE(action.duration == Catch::Approx(2.5));
+}
+
+// ===== SequencerStatistics and Phase3Output Tests =====
+
+TEST_CASE("SequencerStatistics default values", "[phase3][types][stats]") {
+    SequencerStatistics stats;
+
+    REQUIRE(stats.nodesExpanded == 0);
+    REQUIRE(stats.nodesGenerated == 0);
+    REQUIRE(stats.searchTimeMs == 0.0);
+}
+
+TEST_CASE("Phase3Output default values", "[phase3][types][output]") {
+    Phase3Output output;
+
+    REQUIRE(output.bendSequence.empty());
+    REQUIRE(output.actions.empty());
+    REQUIRE(output.totalCycleTime == 0.0);
+    REQUIRE(output.repoCount == 0);
+    REQUIRE(output.success == false);
+    REQUIRE(output.optimal == false);
+}
+
+TEST_CASE("Phase3Output generateSummary", "[phase3][types][output]") {
+    Phase3Output output;
+    output.success = true;
+    output.bendSequence = {0, 2, 1, 3};
+    output.totalCycleTime = 15.5;
+    output.repoCount = 1;
+    output.stats.nodesExpanded = 150;
+    output.stats.searchTimeMs = 25.3;
+
+    std::string summary = output.generateSummary();
+
+    REQUIRE(summary.find("SUCCESS") != std::string::npos);
+    REQUIRE(summary.find("4") != std::string::npos);
+    REQUIRE(summary.find("150") != std::string::npos);
 }
