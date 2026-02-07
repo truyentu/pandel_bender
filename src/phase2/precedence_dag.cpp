@@ -52,6 +52,15 @@ const PrecedenceNode* PrecedenceDAG::getNode(int nodeId) const {
     return &m_nodes[nodeId];
 }
 
+const PrecedenceNode* PrecedenceDAG::getNodeByBendId(int bendId) const {
+    for (const auto& node : m_nodes) {
+        if (node.bendId == bendId) {
+            return &node;
+        }
+    }
+    return nullptr;
+}
+
 const PrecedenceEdge* PrecedenceDAG::getEdge(int edgeId) const {
     if (edgeId < 0 || edgeId >= static_cast<int>(m_edges.size())) {
         return nullptr;

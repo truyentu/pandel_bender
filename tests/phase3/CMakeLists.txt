@@ -56,3 +56,17 @@ target_include_directories(test_heuristic PRIVATE
 )
 
 catch_discover_tests(test_heuristic)
+
+# Test for successor generator
+add_executable(test_successor test_successor.cpp)
+
+target_link_libraries(test_successor PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase3
+)
+
+target_include_directories(test_successor PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_successor)
