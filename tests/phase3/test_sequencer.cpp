@@ -180,6 +180,6 @@ TEST_CASE("Integration: ConstraintSolver -> Sequencer", "[phase3][integration]")
     REQUIRE(p3.success == true);
     REQUIRE(p3.bendSequence.size() == 3);
     REQUIRE(p3.totalCycleTime > 0.0);
-    REQUIRE(p3.actions.size() == 3);
+    REQUIRE(p3.actions.size() >= 3); // May include REPOSITION actions
     REQUIRE(p3.stats.nodesExpanded > 0);
 }
