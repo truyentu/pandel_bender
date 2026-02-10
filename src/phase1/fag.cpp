@@ -9,6 +9,8 @@
 #include <openpanelcam/core/geometry_utils.h>
 
 #include <BRepBndLib.hxx>
+#include <BRep_Tool.hxx>
+#include <Geom_Surface.hxx>
 
 #include <queue>
 #include <algorithm>

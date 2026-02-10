@@ -6,11 +6,13 @@
 #include <openpanelcam/phase1/phase1.h>
 #include <openpanelcam/core/logger.h>
 #include <openpanelcam/core/error.h>
-#include <openpanelcam/io/step_reader.h>
+#include <openpanelcam/phase1/step_reader.h>
 #include <openpanelcam/phase1/geometry_healer.h>
 #include <openpanelcam/phase1/fag_builder.h>
 #include <openpanelcam/phase1/base_face_identifier.h>
 #include <openpanelcam/phase1/bend_classifier.h>
+
+#include <TopoDS.hxx>
 
 #include <chrono>
 
@@ -29,7 +31,14 @@ Phase1Output parseSTEPFile(const std::string& filePath, const Phase1Config& conf
         LOG_INFO("Phase 1: Loading STEP file: {}", filePath);
 
         STEPReader reader;
-        TopoDS_Shape shape = reader.read(filePath);
+        if (!reader.load(filePath)) {
+            output.success = false;
+            output.errorMessage = "Failed to load STEP file: " + reader.getLastError();
+            LOG_ERROR(output.errorMessage);
+            return output;
+        }
+
+        TopoDS_Shape shape = reader.getShape();
 
         if (shape.IsNull()) {
             output.success = false;
@@ -92,7 +101,7 @@ Phase1Output parseSTEPFile(const std::string& filePath, const Phase1Config& conf
         FAGBuilder fagBuilder;
         fagBuilder.setMinBendRadius(config.minBendRadius);
         fagBuilder.setMinFaceArea(config.minFaceArea);
-        fagBuilder.enableSdfValidation(config.sdfValidation);
+        fagBuilder.setSDFValidation(config.sdfValidation);
 
         FaceAdjacencyGraph fag = fagBuilder.build(workingShape);
 

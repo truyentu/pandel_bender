@@ -15,6 +15,7 @@
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_ListOfShape.hxx>
 #include <TopTools_ListIteratorOfListOfShape.hxx>
+#include <TopTools_DataMapOfShapeInteger.hxx>
 #include <TopoDS.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepAdaptor_Curve.hxx>
@@ -107,7 +108,7 @@ FaceAdjacencyGraph FAGBuilder::build(const TopoDS_Shape& shape) {
         fag.reserve(m_totalFaces, edgeToFaces.Extent());
 
         // Map OCCT face to FAG node ID
-        std::map<TopoDS_Face, int, std::less<TopoDS_Face>> faceToNodeId;
+        TopTools_DataMapOfShapeInteger faceToNodeId;
 
         for (int i = 1; i <= faceMap.Extent(); i++) {
             TopoDS_Face face = TopoDS::Face(faceMap(i));
@@ -123,7 +124,7 @@ FaceAdjacencyGraph FAGBuilder::build(const TopoDS_Shape& shape) {
 
             // Add node to FAG
             int nodeId = fag.addNode(face);
-            faceToNodeId[face] = nodeId;
+            faceToNodeId.Bind(face, nodeId);
 
             LOG_DEBUG("Face {} → Node {} (area: {:.2f} mm²)", i, nodeId, area);
         }
@@ -161,16 +162,13 @@ FaceAdjacencyGraph FAGBuilder::build(const TopoDS_Shape& shape) {
             TopoDS_Face face2 = TopoDS::Face(it.Value());
 
             // Check if both faces are in FAG (not ignored)
-            auto it1 = faceToNodeId.find(face1);
-            auto it2 = faceToNodeId.find(face2);
-
-            if (it1 == faceToNodeId.end() || it2 == faceToNodeId.end()) {
+            if (!faceToNodeId.IsBound(face1) || !faceToNodeId.IsBound(face2)) {
                 // One or both faces were ignored
                 continue;
             }
 
-            int nodeId1 = it1->second;
-            int nodeId2 = it2->second;
+            int nodeId1 = faceToNodeId.Find(face1);
+            int nodeId2 = faceToNodeId.Find(face2);
 
             // Classify edge
             EdgeClassification classification = classifyEdge(edge, face1, face2);

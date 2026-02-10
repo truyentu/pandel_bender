@@ -12,6 +12,7 @@ project(OpenPanelCAM
 option(OPENPANELCAM_BUILD_TESTS "Build test suite" ON)
 option(OPENPANELCAM_BUILD_SAMPLES "Build sample applications" ON)
 option(OPENPANELCAM_BUILD_DOCS "Build documentation" OFF)
+option(OPENPANELCAM_BUILD_UI "Build desktop UI application" ON)
 option(OPENPANELCAM_ENABLE_WARNINGS "Enable compiler warnings" ON)
 option(OPENPANELCAM_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 
@@ -36,6 +37,10 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 #==============================================================================
 
 message(STATUS "Finding dependencies...")
+
+# VTK (needed by OpenCASCADE Visualization targets)
+# Disabled: miniconda VTK conflicts with vcpkg GLEW
+# find_package(VTK CONFIG QUIET)
 
 # OpenCASCADE
 find_package(OpenCASCADE CONFIG)
@@ -67,6 +72,16 @@ find_package(Boost COMPONENTS graph)
 
 # PugiXML
 find_package(pugixml)
+
+# Qt6 (for UI)
+if(OPENPANELCAM_BUILD_UI)
+    list(APPEND CMAKE_PREFIX_PATH "C:/Qt/6.8.3/msvc2022_64")
+    find_package(Qt6 COMPONENTS Widgets OpenGLWidgets QUIET)
+    if(NOT Qt6_FOUND)
+        message(WARNING "Qt6 not found - UI will not be built")
+        set(OPENPANELCAM_BUILD_UI OFF)
+    endif()
+endif()
 
 # Catch2 (for testing)
 if(OPENPANELCAM_BUILD_TESTS)
@@ -134,6 +149,11 @@ add_subdirectory(src/phase3)
 add_subdirectory(src/phase4)
 add_subdirectory(src/phase5)
 
+# Unfold module
+if(OpenCASCADE_FOUND)
+    add_subdirectory(src/unfold)
+endif()
+
 # Tests
 if(OPENPANELCAM_BUILD_TESTS)
     enable_testing()
@@ -143,6 +163,11 @@ endif()
 # Samples (need core and phase1)
 if(OPENPANELCAM_BUILD_SAMPLES AND OpenCASCADE_FOUND AND Eigen3_FOUND AND spdlog_FOUND AND fmt_FOUND)
     add_subdirectory(samples)
+endif()
+
+# UI application
+if(OPENPANELCAM_BUILD_UI AND OpenCASCADE_FOUND)
+    add_subdirectory(src/ui)
 endif()
 
 #==============================================================================
@@ -169,4 +194,6 @@ message(STATUS "Build Samples: ${OPENPANELCAM_BUILD_SAMPLES}")
 message(STATUS "Build Docs: ${OPENPANELCAM_BUILD_DOCS}")
 message(STATUS "OpenCASCADE: ${OpenCASCADE_VERSION}")
 message(STATUS "Eigen3: ${Eigen3_VERSION}")
+message(STATUS "Qt6: ${Qt6_VERSION}")
+message(STATUS "Build UI: ${OPENPANELCAM_BUILD_UI}")
 message(STATUS "========================================")

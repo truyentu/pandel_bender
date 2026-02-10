@@ -296,6 +296,28 @@ std::vector<std::string> GeometryHealer::getIssuesFound() const {
     return m_issues;
 }
 
+GeometryHealer::HealingResult GeometryHealer::heal(
+    const TopoDS_Shape& input, const HealingOptions& options)
+{
+    HealingResult result;
+
+    setUnifySameDomain(options.sewFaces);
+    setSewing(options.sewFaces);
+
+    try {
+        TopoDS_Shape healed = heal(input);
+        result.success = true;
+        result.healedShape = healed;
+        result.issuesFixed = static_cast<int>(m_issues.size());
+        result.warnings = m_issues;
+    } catch (const std::exception& e) {
+        result.success = false;
+        result.errorMessage = e.what();
+    }
+
+    return result;
+}
+
 bool GeometryHealer::hadCriticalIssues() const {
     return m_hadCriticalIssues;
 }

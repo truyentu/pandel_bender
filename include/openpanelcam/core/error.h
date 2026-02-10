@@ -40,14 +40,17 @@ enum class ErrorCode {
     STEP_LOAD_FAILED = 100,
     STEP_PARSE_ERROR = 101,
     INVALID_STEP_FORMAT = 102,
-    GEOMETRY_HEALING_FAILED = 103,
-    NO_SOLID_FOUND = 104,
-    EMPTY_SHAPE = 105,
-    FAG_CONSTRUCTION_FAILED = 106,
-    NO_PLANAR_FACES = 107,
-    NO_BENDS_FOUND = 108,
-    BASE_FACE_AMBIGUOUS = 109,
-    INCONSISTENT_NORMALS = 110,
+    GEOMETRY_INVALID = 103,
+    GEOMETRY_HEALING_FAILED = 104,
+    NO_SOLID_FOUND = 105,
+    EMPTY_SHAPE = 106,
+    FAG_CONSTRUCTION_FAILED = 107,
+    FAG_INVALID_NODE_ID = 108,
+    FAG_INVALID_EDGE_ID = 109,
+    NO_PLANAR_FACES = 110,
+    NO_BENDS_FOUND = 111,
+    BASE_FACE_AMBIGUOUS = 112,
+    INCONSISTENT_NORMALS = 113,
 
     // Phase 2 errors (200-299)
     PRECEDENCE_CYCLE_DETECTED = 200,
@@ -188,5 +191,8 @@ public:
 
 #define THROW_PHASE5(code, msg, ...) \
     throw ::openpanelcam::Phase5Exception(code, msg, ##__VA_ARGS__)
+
+#define THROW_OCCT(msg, ...) \
+    throw ::openpanelcam::OCCTException(msg, ##__VA_ARGS__)
 
 } // namespace openpanelcam

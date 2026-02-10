@@ -1,5 +1,6 @@
 # Build directories
 build/
+build_*/
 cmake-build-*/
 out/
 
@@ -40,6 +41,7 @@ Testing/
 .DS_Store
 Thumbs.db
 desktop.ini
+nul
 
 # Editor backups
 *~
@@ -47,9 +49,17 @@ desktop.ini
 *.swo
 *.bak
 
-# Documentation build
-docs/html/
-docs/latex/
+# PDF files
+*.pdf
+
+# Markdown files
+*.md
+
+# Documentation
+docs/
+
+# Research papers
+research_paper/
 
 # Temporary files
 *.tmp

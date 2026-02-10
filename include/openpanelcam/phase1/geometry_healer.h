@@ -36,6 +36,27 @@ namespace openpanelcam {
  */
 class GeometryHealer {
 public:
+    /**
+     * @brief Healing options
+     */
+    struct HealingOptions {
+        bool fixSmallEdges = true;
+        bool fixSmallFaces = true;
+        bool sewFaces = true;
+        bool fixOrientation = true;
+    };
+
+    /**
+     * @brief Healing result
+     */
+    struct HealingResult {
+        bool success = false;
+        TopoDS_Shape healedShape;
+        int issuesFixed = 0;
+        std::string errorMessage;
+        std::vector<std::string> warnings;
+    };
+
     GeometryHealer();
 
     /**
@@ -73,6 +94,11 @@ public:
      * 3. sewFaces() - Close small gaps
      */
     TopoDS_Shape heal(const TopoDS_Shape& input);
+
+    /**
+     * @brief Healing pipeline with options and result
+     */
+    HealingResult heal(const TopoDS_Shape& input, const HealingOptions& options);
 
     /**
      * @brief Step 1: Fix shape issues
