@@ -18,6 +18,7 @@ struct SweptVolume {
     OBB obb;
     int bendId = -1;
     double sweepAngle = 0.0;
+    std::vector<AABB> intervalAABBs;  // Angular interval AABBs for fine collision check
 };
 
 /**
@@ -42,6 +43,32 @@ public:
      * extends from the initial flat position to the bent position.
      */
     AABB estimateSweptAABB(const phase1::BendFeature& bend) const;
+
+    /**
+     * @brief Generate AABBs for angular intervals during bend sweep
+     *
+     * Paper: 10 intervals if flange length < 100mm, 20 if >= 100mm.
+     * Each interval covers (theta/I) degrees of the sweep.
+     *
+     * @param bend The bend feature
+     * @return Vector of I+1 AABBs covering the sweep trajectory
+     */
+    std::vector<AABB> generateIntervalAABBs(const phase1::BendFeature& bend) const;
+
+    /**
+     * @brief Compute number of angular intervals per paper heuristic
+     * @param flangeLength Length of the flange being bent
+     * @return 10 if length < 100mm, 20 otherwise
+     */
+    static int computeIntervalCount(double flangeLength);
+
+    /**
+     * @brief Estimate AABB at a specific angle during the sweep
+     * @param bend The bend feature
+     * @param currentAngle The angle at this point in the sweep (degrees)
+     * @return AABB at this intermediate position
+     */
+    AABB estimateAABBAtAngle(const phase1::BendFeature& bend, double currentAngle) const;
 };
 
 } // namespace phase4

@@ -108,8 +108,9 @@ TEST_CASE("stepCost uses max for parallel operations", "[phase3][cost]") {
 
     double totalCost = cost.stepCost(current, 0, next, bend);
 
-    // Expected: 2.0 (bend) + max(1.5, 0.8) (parallel) + 0 (repo) = 3.5
-    REQUIRE(totalCost == Approx(3.5));
+    // Expected: 2.0 (bend) + max(1.5, 0.8) (parallel) + 0 (repo)
+    //         + 1.0 (tooling change: ABA changed) = 4.5
+    REQUIRE(totalCost == Approx(4.5));
 }
 
 TEST_CASE("stepCost with repo adds full repo time", "[phase3][cost]") {
@@ -204,4 +205,111 @@ TEST_CASE("BendTimeEstimator with custom config", "[phase3][cost][estimator]") {
     // time = 3.0 * 1.0 * 1.0 + 0.75 = 3.75
     double time = estimator.estimate(bend);
     REQUIRE(time == Approx(3.75));
+}
+
+// ===== Constraint Penalty Tests =====
+
+TEST_CASE("constraintPenalty: zero when no changes", "[phase3][cost][penalty]") {
+    MaskedTimeCost cost;
+
+    SearchState current;
+    current.orientation = Orientation::DEG_0;
+    current.abaConfig = 100;
+
+    SearchState next = current;
+    next.markBent(0);
+
+    REQUIRE(cost.constraintPenalty(current, next) == Approx(0.0));
+}
+
+TEST_CASE("constraintPenalty: tooling change adds K1", "[phase3][cost][penalty]") {
+    MaskedTimeCost cost;
+
+    SearchState current;
+    current.abaConfig = 100;
+
+    SearchState next;
+    next.abaConfig = 200;  // Different ABA config = tooling change
+
+    double penalty = cost.constraintPenalty(current, next);
+    REQUIRE(penalty == Approx(cost.config().toolingChangeWeight));
+}
+
+TEST_CASE("constraintPenalty: 180-degree turnover adds K2", "[phase3][cost][penalty]") {
+    MaskedTimeCost cost;
+
+    SearchState current;
+    current.orientation = Orientation::DEG_0;
+
+    SearchState next;
+    next.orientation = Orientation::DEG_180;  // 180° = turnover
+
+    double penalty = cost.constraintPenalty(current, next);
+    REQUIRE(penalty == Approx(cost.config().workpieceTurnoverWeight));
+}
+
+TEST_CASE("constraintPenalty: 90-degree rotation NOT a turnover", "[phase3][cost][penalty]") {
+    MaskedTimeCost cost;
+
+    SearchState current;
+    current.orientation = Orientation::DEG_0;
+
+    SearchState next;
+    next.orientation = Orientation::DEG_90;  // 90° = not turnover
+
+    // No ABA change either
+    double penalty = cost.constraintPenalty(current, next);
+    REQUIRE(penalty == Approx(0.0));
+}
+
+TEST_CASE("constraintPenalty: tooling + turnover cumulative", "[phase3][cost][penalty]") {
+    MaskedTimeCost cost;
+
+    SearchState current;
+    current.orientation = Orientation::DEG_0;
+    current.abaConfig = 100;
+
+    SearchState next;
+    next.orientation = Orientation::DEG_180;  // turnover
+    next.abaConfig = 200;                      // tooling change
+
+    double expected = cost.config().toolingChangeWeight
+                    + cost.config().workpieceTurnoverWeight;
+    REQUIRE(cost.constraintPenalty(current, next) == Approx(expected));
+}
+
+TEST_CASE("constraintPenalty: custom weights", "[phase3][cost][penalty]") {
+    CostConfig cfg;
+    cfg.toolingChangeWeight = 3.0;
+    cfg.workpieceTurnoverWeight = 5.0;
+    MaskedTimeCost cost(cfg);
+
+    SearchState current;
+    current.abaConfig = 100;
+
+    SearchState next;
+    next.abaConfig = 200;
+
+    REQUIRE(cost.constraintPenalty(current, next) == Approx(3.0));
+}
+
+TEST_CASE("stepCost: no penalty when same config and orientation", "[phase3][cost][penalty]") {
+    MaskedTimeCost cost;
+
+    SearchState current;
+    current.orientation = Orientation::DEG_0;
+    current.abaConfig = 100;
+
+    SearchState next;
+    next.orientation = Orientation::DEG_0;  // Same
+    next.abaConfig = 100;                    // Same
+    next.needsRepo = false;
+
+    BendFeature bend;
+    bend.angle = 90.0;
+
+    double totalCost = cost.stepCost(current, 0, next, bend);
+
+    // 2.0 (bend) + max(0, 0) + 0 (repo) + 0 (penalty) = 2.0
+    REQUIRE(totalCost == Approx(2.0));
 }

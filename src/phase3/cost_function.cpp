@@ -58,7 +58,10 @@ double MaskedTimeCost::stepCost(const SearchState& current,
     // CRITICAL: Parallel operations use max(), not sum()
     double t_parallel = std::max(t_rot, t_aba);
 
-    return t_bend + t_parallel + t_repo;
+    // Multiple-Constraint Model: add binary constraint penalties
+    double penalty = constraintPenalty(current, nextState);
+
+    return t_bend + t_parallel + t_repo + penalty;
 }
 
 double MaskedTimeCost::bendTime(const phase1::BendFeature& bend) const {
@@ -91,6 +94,39 @@ double MaskedTimeCost::abaTime(uint16_t fromConfig, uint16_t toConfig) const {
 double MaskedTimeCost::repoTime(bool needsRepo) const {
     if (!needsRepo) return 0.0;
     return m_config.totalRepoTime();
+}
+
+double MaskedTimeCost::constraintPenalty(const SearchState& current,
+                                          const SearchState& nextState) const {
+    double penalty = 0.0;
+
+    // C1: Tooling change — ABA config changed
+    bool toolingChanged = (current.abaConfig != nextState.abaConfig);
+    if (toolingChanged) {
+        penalty += m_config.toolingChangeWeight;
+    }
+
+    // C2: Workpiece turnover — 180° rotation
+    int fromVal = static_cast<int>(current.orientation);
+    int toVal = static_cast<int>(nextState.orientation);
+    int diff = std::abs(fromVal - toVal);
+    int steps = std::min(diff, 4 - diff);
+    bool isTurnover = (steps == 2); // 180° = 2 steps
+    if (isTurnover) {
+        penalty += m_config.workpieceTurnoverWeight;
+    }
+
+    // C3: Gravity/CoG — approximate by checking if many bends done on one side
+    // Heuristic: if more than half the bends are done, the part geometry
+    // may have shifted CoG unfavorably (simplified binary check)
+    int bentCount = nextState.bentCount();
+    int prevBentCount = current.bentCount();
+    bool crossedHalfway = (prevBentCount <= 16 && bentCount > 16);
+    if (crossedHalfway) {
+        penalty += m_config.gravityLocationWeight;
+    }
+
+    return penalty;
 }
 
 } // namespace phase3

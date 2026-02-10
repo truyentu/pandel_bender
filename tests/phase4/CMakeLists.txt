@@ -113,3 +113,45 @@ target_include_directories(test_phase4_integration PRIVATE
 )
 
 catch_discover_tests(test_phase4_integration)
+
+# Test for AABB tree hierarchy
+add_executable(test_aabb_tree test_aabb_tree.cpp)
+
+target_link_libraries(test_aabb_tree PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_aabb_tree PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_aabb_tree)
+
+# Test for negative sequence analysis
+add_executable(test_negative_sequence test_negative_sequence.cpp)
+
+target_link_libraries(test_negative_sequence PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_negative_sequence PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_negative_sequence)
+
+# Test for angular interval swept volume
+add_executable(test_angular_intervals test_angular_intervals.cpp)
+
+target_link_libraries(test_angular_intervals PRIVATE
+    Catch2::Catch2WithMain
+    openpanelcam_phase4
+)
+
+target_include_directories(test_angular_intervals PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
+catch_discover_tests(test_angular_intervals)

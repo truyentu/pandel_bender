@@ -86,5 +86,78 @@ CollisionResult CollisionDetector::checkAgainstVolumes(
     return result;
 }
 
+CollisionResult CollisionDetector::checkIntervals(
+    const SweptVolume& swept,
+    const BentState& bentState) const
+{
+    CollisionResult result;
+
+    if (swept.intervalAABBs.empty()) {
+        return result;  // No intervals to check
+    }
+
+    const auto& flanges = bentState.getBentFlanges();
+
+    for (size_t i = 0; i < swept.intervalAABBs.size(); i++) {
+        AABB intervalBox = swept.intervalAABBs[i].expand(m_config.collisionMargin);
+
+        for (const auto& flange : flanges) {
+            if (flange.bendId == swept.bendId) continue;
+
+            if (intervalBox.overlaps(flange.occupiedVolume)) {
+                result.hasCollision = true;
+                result.type = CollisionType::SWEPT_VS_FIXED;
+                result.bendId = swept.bendId;
+                result.collidingBendId = flange.bendId;
+                result.description = "Swept interval " +
+                    std::to_string(i) + "/" +
+                    std::to_string(swept.intervalAABBs.size()) +
+                    " of bend " + std::to_string(swept.bendId) +
+                    " collides with bent flange " +
+                    std::to_string(flange.bendId);
+
+                // Penetration depth from interval AABB
+                double overlapX = std::min(intervalBox.maxX, flange.occupiedVolume.maxX) -
+                                  std::max(intervalBox.minX, flange.occupiedVolume.minX);
+                double overlapY = std::min(intervalBox.maxY, flange.occupiedVolume.maxY) -
+                                  std::max(intervalBox.minY, flange.occupiedVolume.minY);
+                double overlapZ = std::min(intervalBox.maxZ, flange.occupiedVolume.maxZ) -
+                                  std::max(intervalBox.minZ, flange.occupiedVolume.minZ);
+                result.penetrationDepth = std::min({overlapX, overlapY, overlapZ});
+
+                return result;
+            }
+        }
+    }
+
+    return result;
+}
+
+CollisionResult CollisionDetector::checkDualState(
+    const phase1::BendFeature& bend,
+    const BentState& foldedState,
+    const BentState& unfoldedState) const
+{
+    SweptVolumeGenerator gen;
+    SweptVolume swept = gen.generate(bend);
+
+    // STEP 1: Check collision in FOLDED state (post-bend)
+    CollisionResult foldedResult = checkStep(swept, foldedState);
+    if (foldedResult.hasCollision) {
+        foldedResult.description = "[Folded] " + foldedResult.description;
+        return foldedResult;
+    }
+
+    // STEP 2: Check collision in UNFOLDED state (pre-bend)
+    CollisionResult unfoldedResult = checkStep(swept, unfoldedState);
+    if (unfoldedResult.hasCollision) {
+        unfoldedResult.description = "[Unfolded] " + unfoldedResult.description;
+        return unfoldedResult;
+    }
+
+    // No collision in either state
+    return CollisionResult();
+}
+
 } // namespace phase4
 } // namespace openpanelcam

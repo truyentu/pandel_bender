@@ -206,7 +206,7 @@ struct ValidatorConfig {
     double frictionCoeff = 0.3;
 
     double collisionMargin = 2.0;
-    bool useOBB = true;
+    bool useOBB = false;  // Paper: AABB is ~50x faster than OBB, sufficient for planning
 
     double materialDensity = 7.85e-6;
     double materialThickness = 1.5;
@@ -215,6 +215,22 @@ struct ValidatorConfig {
     bool enableSpringback = true;
     double springbackBaseDeg = 2.0;
     double springbackPerMm = 0.5;
+
+    bool enableToolCollision = true;  // Paper: check tool-vs-part collision
+    double kFactorCorrection = 0.0;   // Paper: k-factor offset to reduce false positives
+};
+
+/**
+ * @brief Tool geometry for tool-vs-part collision (paper: punch/die)
+ *
+ * Paper: "self-intersections of the folded shape and clashes
+ * with externally defined geometries of punch tools"
+ */
+struct ToolGeometry {
+    AABB punchAABB;   // Punch bounding volume
+    AABB dieAABB;     // Die bounding volume
+    int toolId = -1;
+    bool valid = false;
 };
 
 } // namespace phase4

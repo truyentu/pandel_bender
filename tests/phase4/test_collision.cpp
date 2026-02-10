@@ -263,3 +263,75 @@ TEST_CASE("CollisionDetector collision description is set", "[phase4][collision]
     REQUIRE(!result.description.empty());
     REQUIRE(result.description.find("bend 1") != std::string::npos);
 }
+
+// ===== checkDualState Tests =====
+
+TEST_CASE("checkDualState: no collision in either state", "[phase4][collision][dual]") {
+    CollisionDetector detector;
+    BentState foldedState, unfoldedState;
+
+    // Folded state has distant bend
+    foldedState.addBentFlange(makeBend(1, 90.0, 50.0, 2000, 2000, 0, 0, 1, 0));
+
+    auto bend = makeBend(0, 90.0, 50.0, 0, 0, 0, 1, 0, 0);
+
+    auto result = detector.checkDualState(bend, foldedState, unfoldedState);
+    REQUIRE(result.hasCollision == false);
+}
+
+TEST_CASE("checkDualState: collision in folded state", "[phase4][collision][dual]") {
+    CollisionDetector detector;
+    BentState foldedState, unfoldedState;
+
+    // Folded state has overlapping bend
+    foldedState.addBentFlange(makeBend(1, 90.0, 100.0, 0, 0, 0, 0, 1, 0));
+
+    auto bend = makeBend(0, 90.0, 100.0, 0, 0, 0, 1, 0, 0);
+
+    auto result = detector.checkDualState(bend, foldedState, unfoldedState);
+    REQUIRE(result.hasCollision == true);
+    REQUIRE(result.description.find("[Folded]") != std::string::npos);
+}
+
+TEST_CASE("checkDualState: collision in unfolded state", "[phase4][collision][dual]") {
+    CollisionDetector detector;
+    BentState foldedState, unfoldedState;
+
+    // Unfolded state has overlapping bend
+    unfoldedState.addBentFlange(makeBend(1, 90.0, 100.0, 0, 0, 0, 0, 1, 0));
+
+    auto bend = makeBend(0, 90.0, 100.0, 0, 0, 0, 1, 0, 0);
+
+    auto result = detector.checkDualState(bend, foldedState, unfoldedState);
+    REQUIRE(result.hasCollision == true);
+    REQUIRE(result.description.find("[Unfolded]") != std::string::npos);
+}
+
+// ===== BentState k-factor Tests =====
+
+TEST_CASE("BentState k-factor correction shrinks AABB", "[phase4][bent][kfactor]") {
+    BentState state1, state2;
+    auto bend = makeBend(0, 90.0, 100.0, 0, 0, 0, 1, 0, 0);
+
+    state1.addBentFlange(bend);         // No k-factor
+    state2.addBentFlange(bend, 0.4);    // With k-factor
+
+    auto vol1 = state1.getAllOccupiedVolumes()[0];
+    auto vol2 = state2.getAllOccupiedVolumes()[0];
+
+    // K-factor corrected AABB should be smaller
+    REQUIRE(vol2.volume() < vol1.volume());
+}
+
+TEST_CASE("BentState k-factor=0 gives same as default", "[phase4][bent][kfactor]") {
+    BentState state1, state2;
+    auto bend = makeBend(0, 90.0, 100.0, 0, 0, 0, 1, 0, 0);
+
+    state1.addBentFlange(bend);
+    state2.addBentFlange(bend, 0.0);
+
+    auto vol1 = state1.getAllOccupiedVolumes()[0];
+    auto vol2 = state2.getAllOccupiedVolumes()[0];
+
+    REQUIRE(vol1.volume() == Approx(vol2.volume()));
+}

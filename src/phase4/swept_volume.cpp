@@ -20,6 +20,9 @@ SweptVolume SweptVolumeGenerator::generate(const phase1::BendFeature& bend) cons
     sv.obb.halfExtentZ = (sv.aabb.maxZ - sv.aabb.minZ) / 2.0;
     // Default identity axes for now
 
+    // Generate angular interval AABBs per paper
+    sv.intervalAABBs = generateIntervalAABBs(bend);
+
     return sv;
 }
 
@@ -86,6 +89,70 @@ AABB SweptVolumeGenerator::estimateSweptAABB(const phase1::BendFeature& bend) co
 
     return AABB(px - extentX, py - extentY, pz - extentZ,
                 px + extentX, py + extentY, pz + extentZ);
+}
+
+int SweptVolumeGenerator::computeIntervalCount(double flangeLength) {
+    // Paper heuristic: 10 intervals for short, 20 for long
+    return (flangeLength < 100.0) ? 10 : 20;
+}
+
+AABB SweptVolumeGenerator::estimateAABBAtAngle(
+    const phase1::BendFeature& bend, double currentAngle) const
+{
+    double px = bend.position.x;
+    double py = bend.position.y;
+    double pz = bend.position.z;
+
+    double flangeExtent = bend.length;
+    double angleRad = std::abs(currentAngle) * 3.14159265358979 / 180.0;
+
+    double nx = bend.normal.x;
+    double ny = bend.normal.y;
+    double nz = bend.normal.z;
+
+    double dx = bend.direction.x;
+    double dy = bend.direction.y;
+    double dz = bend.direction.z;
+
+    double cosA = std::cos(angleRad);
+    double sinA = std::sin(angleRad);
+
+    double halfLen = flangeExtent / 2.0;
+
+    // Flange tip position relative to bend line at this angle
+    // Flat direction component (cos) and height component (sin)
+    double flatExtent = flangeExtent * std::max(std::abs(cosA), 0.1);
+    double heightExtent = flangeExtent * std::abs(sinA);
+
+    double extX = std::abs(dx) * halfLen + flatExtent * 0.5 + heightExtent * std::abs(nx);
+    double extY = std::abs(dy) * halfLen + flatExtent * 0.5 + heightExtent * std::abs(ny);
+    double extZ = std::abs(dz) * halfLen + flatExtent * 0.5 + heightExtent * std::abs(nz);
+
+    extX = std::max(extX, 5.0);
+    extY = std::max(extY, 5.0);
+    extZ = std::max(extZ, 5.0);
+
+    return AABB(px - extX, py - extY, pz - extZ,
+                px + extX, py + extY, pz + extZ);
+}
+
+std::vector<AABB> SweptVolumeGenerator::generateIntervalAABBs(
+    const phase1::BendFeature& bend) const
+{
+    int intervals = computeIntervalCount(bend.length);
+    double totalAngle = std::abs(bend.angle);
+    double increment = totalAngle / intervals;
+
+    std::vector<AABB> result;
+    result.reserve(intervals + 1);
+
+    // Paper: check I+1 configurations (start, intermediates, end)
+    for (int i = 0; i <= intervals; i++) {
+        double angle = i * increment;
+        result.push_back(estimateAABBAtAngle(bend, angle));
+    }
+
+    return result;
 }
 
 } // namespace phase4

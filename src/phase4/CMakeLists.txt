@@ -10,6 +10,8 @@ add_library(openpanelcam_phase4 STATIC
     grasp_physics.cpp
     extraction_checker.cpp
     sequence_validator.cpp
+    aabb_tree.cpp
+    negative_sequence.cpp
 )
 
 target_include_directories(openpanelcam_phase4 PUBLIC

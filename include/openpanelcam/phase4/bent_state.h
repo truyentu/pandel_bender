@@ -33,6 +33,18 @@ public:
     void addBentFlange(const phase1::BendFeature& bend);
 
     /**
+     * @brief Add a bent flange with k-factor correction
+     *
+     * Paper: simple rotation idealization causes false-positive collisions.
+     * K-factor accounts for material deformation at bend, shrinking the
+     * occupied AABB to avoid over-conservative volumes.
+     *
+     * @param bend The bend feature
+     * @param kFactor K-factor correction (typically 0.3-0.5, 0 = no correction)
+     */
+    void addBentFlange(const phase1::BendFeature& bend, double kFactor);
+
+    /**
      * @brief Get all bent flanges
      */
     const std::vector<BentFlange>& getBentFlanges() const { return m_flanges; }
@@ -59,6 +71,11 @@ private:
      * @brief Estimate occupied AABB for a bent flange
      */
     AABB estimateOccupiedAABB(const phase1::BendFeature& bend) const;
+
+    /**
+     * @brief Estimate AABB with k-factor shrinkage
+     */
+    AABB estimateOccupiedAABB(const phase1::BendFeature& bend, double kFactor) const;
 };
 
 } // namespace phase4

@@ -27,6 +27,14 @@ struct CostConfig {
     double repoAcquireTime = 2.0;
     double repoSafetyMargin = 1.0;
 
+    // --- Multiple-Constraint Model weights (K_i) ---
+    // Binary constraint penalties from paper:
+    //   g(i) = t_bend + max(t_rot, t_aba) + t_repo + Σ(C_s × K_i)
+    //   C_s ∈ {0,1} — whether the event occurs
+    double toolingChangeWeight = 1.0;      // K1: penalty when tool change needed
+    double workpieceTurnoverWeight = 1.5;   // K2: penalty for turnover (180° rotation)
+    double gravityLocationWeight = 0.5;     // K3: penalty for unfavorable CoG position
+
     double totalRepoTime() const {
         return repoReleaseTime + repoReorientTime + repoAcquireTime + repoSafetyMargin;
     }
@@ -52,10 +60,16 @@ private:
 /**
  * @brief Masked Time cost function for A* search
  *
- * Implements: StepCost = t_bend + max(t_rotation, t_aba) + t_repo
+ * Implements the Multiple-Constraint Model from literature:
+ *   StepCost = t_bend + max(t_rotation, t_aba) + t_repo + Σ(C_s × K_i)
  *
  * Key insight: Rotation and ABA reconfiguration happen in PARALLEL,
  * so we use max() not sum().
+ *
+ * Constraint weights K_i (binary penalties):
+ *   K1: tooling change needed
+ *   K2: workpiece turnover (180° rotation)
+ *   K3: unfavorable gravity/center-of-gravity position
  */
 class MaskedTimeCost {
 public:
@@ -73,6 +87,10 @@ public:
     double abaTime(uint16_t fromConfig, uint16_t toConfig) const;
 
     double repoTime(bool needsRepo) const;
+
+    /// Compute binary constraint penalty Σ(C_s × K_i)
+    double constraintPenalty(const SearchState& current,
+                             const SearchState& nextState) const;
 
     const CostConfig& config() const { return m_config; }
 

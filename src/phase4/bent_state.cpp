@@ -85,5 +85,42 @@ AABB BentState::estimateOccupiedAABB(const phase1::BendFeature& bend) const {
                 px + extX, py + extY, pz + extZ);
 }
 
+void BentState::addBentFlange(const phase1::BendFeature& bend, double kFactor) {
+    BentFlange flange;
+    flange.bendId = bend.id;
+    flange.angle = bend.angle;
+    flange.occupiedVolume = estimateOccupiedAABB(bend, kFactor);
+
+    // OBB from AABB
+    flange.occupiedOBB.centerX = (flange.occupiedVolume.minX + flange.occupiedVolume.maxX) / 2.0;
+    flange.occupiedOBB.centerY = (flange.occupiedVolume.minY + flange.occupiedVolume.maxY) / 2.0;
+    flange.occupiedOBB.centerZ = (flange.occupiedVolume.minZ + flange.occupiedVolume.maxZ) / 2.0;
+    flange.occupiedOBB.halfExtentX = (flange.occupiedVolume.maxX - flange.occupiedVolume.minX) / 2.0;
+    flange.occupiedOBB.halfExtentY = (flange.occupiedVolume.maxY - flange.occupiedVolume.minY) / 2.0;
+    flange.occupiedOBB.halfExtentZ = (flange.occupiedVolume.maxZ - flange.occupiedVolume.minZ) / 2.0;
+
+    m_flanges.push_back(flange);
+}
+
+AABB BentState::estimateOccupiedAABB(const phase1::BendFeature& bend, double kFactor) const {
+    // Get base AABB
+    AABB base = estimateOccupiedAABB(bend);
+
+    if (kFactor <= 0.0 || kFactor >= 1.0) {
+        return base;
+    }
+
+    // Paper: k-factor correction shrinks AABB to account for material
+    // deformation at the bend. The neutral axis shifts inward by
+    // kFactor * thickness, reducing the effective flange extent.
+    // This avoids false-positive collisions from pure rotation idealization.
+    double shrinkage = kFactor * 1.5;  // 1.5mm default thickness
+
+    return AABB(
+        base.minX + shrinkage, base.minY + shrinkage, base.minZ + shrinkage,
+        base.maxX - shrinkage, base.maxY - shrinkage, base.maxZ - shrinkage
+    );
+}
+
 } // namespace phase4
 } // namespace openpanelcam
