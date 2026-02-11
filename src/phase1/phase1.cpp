@@ -113,21 +113,15 @@ Phase1Output parseSTEPFile(const std::string& filePath, const Phase1Config& conf
         }
 
         output.fag = fag;
-        output.totalFaces = fag.nodeCount();
+        output.totalFaces = fagBuilder.getPlanarFaceCount() + fagBuilder.getCylindricalFaceCount();
         output.bendCount = fag.bendCount();
 
         LOG_INFO("FAG built: {} faces, {} bend edges", fag.nodeCount(), fag.bendCount());
 
-        // Count face types
-        for (const auto& node : fag.nodes()) {
-            if (node.type == FaceType::PLANAR) {
-                output.planarFaces++;
-            } else if (node.type == FaceType::CYLINDRICAL) {
-                output.cylindricalFaces++;
-            } else {
-                output.otherFaces++;
-            }
-        }
+        // Face type counts from FAGBuilder (FAG nodes are all planar)
+        output.planarFaces = fagBuilder.getPlanarFaceCount();
+        output.cylindricalFaces = fagBuilder.getCylindricalFaceCount();
+        output.otherFaces = output.totalFaces - output.planarFaces - output.cylindricalFaces;
 
         if (config.verbose) {
             LOG_DEBUG("Face types: {} planar, {} cylindrical, {} other",

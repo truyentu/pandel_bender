@@ -73,7 +73,11 @@ int main(int argc, char** argv) {
     }
 
     // Initialize logger
-    Logger::initialize("parse_step.log", config.verbose ? LogLevel::DEBUG : LogLevel::INFO);
+    LoggerConfig logConfig;
+    logConfig.level = config.verbose ? LogLevel::DEBUG : LogLevel::INFO;
+    logConfig.fileOutput = true;
+    logConfig.logFilePath = "parse_step.log";
+    Logger::initialize(logConfig);
 
     std::cout << "========================================\n";
     std::cout << "OpenPanelCAM - STEP File Parser\n";

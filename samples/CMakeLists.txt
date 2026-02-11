@@ -39,11 +39,22 @@ target_link_libraries(sample_visualize_fag PRIVATE
     nlohmann_json::nlohmann_json
 )
 
+# Sample 4: Generate STEP test files
+add_executable(generate_test_steps
+    generate_test_steps.cpp
+)
+
+target_link_libraries(generate_test_steps PRIVATE
+    openpanelcam_core
+    ${OpenCASCADE_LIBRARIES}
+)
+
 # Install samples
 install(TARGETS
     sample_test_core
     sample_parse_step
     sample_phase1_modules
     sample_visualize_fag
+    generate_test_steps
     RUNTIME DESTINATION bin/samples
 )

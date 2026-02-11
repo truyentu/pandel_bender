@@ -102,6 +102,18 @@ public:
     int getIgnoredFaceCount() const;
 
     /**
+     * @brief Get number of cylindrical (bend) faces found
+     * @return Count of cylindrical faces classified as bends
+     */
+    int getCylindricalFaceCount() const;
+
+    /**
+     * @brief Get number of planar faces found
+     * @return Count of planar faces (FAG nodes)
+     */
+    int getPlanarFaceCount() const;
+
+    /**
      * @brief Get warnings generated during build
      * @return List of warning messages
      */
@@ -125,6 +137,8 @@ private:
     int m_totalEdges;
     int m_bendEdges;
     int m_sharpEdges;
+    int m_cylindricalFaceCount;
+    int m_planarFaceCount;
     std::vector<std::string> m_warnings;
 
     // Internal methods
